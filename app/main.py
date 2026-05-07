@@ -1,8 +1,8 @@
 from fastapi import FastAPI, HTTPException
 from .settings import settings
 from .db import init_db, fetch_result
-from .stock_data_fetcher.get_stock_list import sync_stock_basic_to_postgres
-from .tasks import add
+from .data_fetcher import IndexFetcher, SectorFetcher, StockFetcher
+from .tasks import add, sync_stock_list_task
 
 app = FastAPI(title=settings.APP_NAME)
 
@@ -32,8 +32,9 @@ def get_task_result(task_id: str):
 
 
 @app.post("/stocks/sync")
-def sync_stocks(exchange: str = "", list_status: str = "L", timeout_s: int = 30):
-    try:
-        return sync_stock_basic_to_postgres(exchange=exchange, list_status=list_status, timeout_s=timeout_s)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+def sync_stocks(market: str = "", list_status: str = "L"):
+    """
+    异步同步股票列表任务
+    """
+    task = sync_stock_list_task.delay(market=market, list_status=list_status)
+    return {"celery_task_id": task.id, "state": task.state, "detail": "同步任务已在后台启动"}
