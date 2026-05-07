@@ -35,7 +35,8 @@ class IndexFetcher(TushareFetcher):
         try:
             df_list = []
             for code in ts_codes:
-                df = self.pro.index_daily(
+                df = self.call_with_retry(
+                    self.pro.index_daily,
                     ts_code=code, 
                     start_date=start_date, 
                     end_date=end_date, 

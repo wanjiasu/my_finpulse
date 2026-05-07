@@ -20,7 +20,8 @@ class SectorFetcher(TushareFetcher):
             板单类别：涨停池、连扳池、冲刺涨停、炸板池、跌停池。默认：涨停池。
         """
         try:
-            df = self.pro.limit_list_ths(
+            df = self.call_with_retry(
+                self.pro.limit_list_ths,
                 trade_date=trade_date,
                 limit_type=limit_type,
                 ts_code=ts_code,
@@ -38,7 +39,8 @@ class SectorFetcher(TushareFetcher):
         获取每天涨停股票最多最强的概念板块 (limit_cpt_list)。
         """
         try:
-            df = self.pro.limit_cpt_list(
+            df = self.call_with_retry(
+                self.pro.limit_cpt_list,
                 trade_date=trade_date,
                 ts_code=ts_code,
                 start_date=start_date,
