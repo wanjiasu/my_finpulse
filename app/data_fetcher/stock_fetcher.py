@@ -77,18 +77,3 @@ class StockFetcher(TushareFetcher):
         except Exception as e:
             print(f"获取复权因子时发生错误: {e}")
             return None
-
-    def save_to_db(self, df: pd.DataFrame, table_name: str, if_exists: str = "append"):
-        """
-        将数据保存到数据库。
-        """
-        if df is None or df.empty:
-            return False
-        
-        try:
-            from ..db import engine
-            df.to_sql(table_name, engine, if_exists=if_exists, index=False)
-            return True
-        except Exception as e:
-            print(f"保存数据到表 {table_name} 时发生错误: {e}")
-            return False

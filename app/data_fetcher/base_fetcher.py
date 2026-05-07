@@ -62,3 +62,20 @@ class TushareFetcher:
         else:
             print(f"[{self.__class__.__name__}] {method_name} 未能获取到数据。")
             return None
+
+    def save_to_db(self, df: pd.DataFrame, table_name: str, if_exists: str = "append"):
+        """
+        将数据保存到数据库。
+        """
+        if df is None or df.empty:
+            return False
+        
+        try:
+            from ..db import engine
+            # 如果是板块指数或股票列表这种具有唯一主键的代码，建议使用 replace 或处理冲突
+            # 这里简单起见先使用 append，实际业务中可根据表结构调整
+            df.to_sql(table_name, engine, if_exists=if_exists, index=False)
+            return True
+        except Exception as e:
+            print(f"保存数据到表 {table_name} 时发生错误: {e}")
+            return False

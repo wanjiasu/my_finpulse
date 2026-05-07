@@ -3,7 +3,7 @@ from fastapi import FastAPI, HTTPException
 from .settings import settings
 from .db import init_db, fetch_result
 from .data_fetcher import IndexFetcher, SectorFetcher, StockFetcher
-from .tasks import add, sync_stock_list_task, sync_history_data_task, sync_stock_data_by_day
+from .tasks import add, sync_stock_list_task, sync_history_data_task, sync_stock_data_by_day, sync_ths_index_task
 
 app = FastAPI(title=settings.APP_NAME)
 
@@ -59,3 +59,12 @@ def sync_daily(trade_date: str = None):
         trade_date = datetime.now().strftime("%Y%m%d")
     task = sync_stock_data_by_day.delay(trade_date=trade_date)
     return {"celery_task_id": task.id, "state": task.state, "detail": f"{trade_date} 同步任务已启动"}
+
+
+@app.post("/sectors/ths_index/sync")
+def sync_ths_index(exchange: str = "A", index_type: str = ""):
+    """
+    异步同步同花顺板块指数
+    """
+    task = sync_ths_index_task.delay(exchange=exchange, index_type=index_type)
+    return {"celery_task_id": task.id, "state": task.state, "detail": "同花顺板块指数同步任务已启动"}

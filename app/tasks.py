@@ -37,6 +37,36 @@ def sync_stock_list_task(market: str = "", list_status: str = "L"):
 
 
 @celery.task(
+    name="tasks.sync_ths_index",
+    autoretry_for=(Exception,),
+    retry_kwargs={'max_retries': 3},
+    retry_backoff=60
+)
+def sync_ths_index_task(exchange: str = "A", index_type: str = ""):
+    """
+    异步同步同花顺板块指数任务
+    """
+    fetcher = SectorFetcher()
+    df = fetcher.get_ths_index(exchange=exchange, index_type=index_type)
+    
+    if df is not None:
+        count = len(df)
+        # 将数据保存到数据库，如果已存在则替换
+        success = fetcher.save_to_db(df, "stock_ths_index", if_exists="replace")
+        
+        if success:
+            result_msg = f"成功同步同花顺板块指数并入库，共 {count} 条记录。"
+        else:
+            result_msg = f"成功同步同花顺板块指数，但入库失败。共 {count} 条记录。"
+            
+        save_result(celery_task_id=sync_ths_index_task.request.id, result=result_msg)
+        return {"status": "success" if success else "partial_success", "count": count}
+    
+    save_result(celery_task_id=sync_ths_index_task.request.id, result="同步同花顺板块指数失败。")
+    return {"status": "failed"}
+
+
+@celery.task(
     name="tasks.sync_stock_data_by_day",
     autoretry_for=(Exception,),
     retry_kwargs={'max_retries': 5},
