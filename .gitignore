@@ -41,3 +41,6 @@ celerybeat.pid
 
 # .venv
 .venv/
+
+# test
+test/
