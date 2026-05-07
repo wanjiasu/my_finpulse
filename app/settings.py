@@ -12,5 +12,7 @@ class Settings(BaseSettings):
 
     POSTGRES_DSN: str
 
+    TUSHARE_TOKEN: str = ""
+
 
 settings = Settings()

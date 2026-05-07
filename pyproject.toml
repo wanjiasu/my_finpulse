@@ -12,4 +12,7 @@ dependencies = [
     "redis==5.0.8",
     "psycopg2-binary==2.9.9",
     "pydantic-settings==2.4.0",
+    "tushare>=1.4.29",
+    "pandas>=2.3.3",
+    "python-dotenv>=1.2.1",
 ]
