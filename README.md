@@ -52,7 +52,7 @@
 cp env.example .env
 ```
 
-请根据实际情况修改 `.env` 文件中的 `REDIS_URL` 和 `POSTGRES_DSN`。**注意：默认配置假设 Redis 和 PostgreSQL 在外部服务器运行。**
+默认配置已优化为使用 Docker Compose 启动的本地服务。
 
 ### 2. 使用 Docker Compose 启动
 
@@ -60,10 +60,12 @@ cp env.example .env
 docker-compose up --build
 ```
 
-启动后：
+启动后，所有依赖项（包括 Redis 和 PostgreSQL）都会自动在容器中运行。
 - **API 服务**: [http://localhost:8000](http://localhost:8000)
 - **Flower 监控**: [http://localhost:5555](http://localhost:5555)
 - **API 文档 (Swagger)**: [http://localhost:8000/docs](http://localhost:8000/docs)
+- **Redis**: `localhost:6379`
+- **PostgreSQL**: `localhost:5432`
 
 ### 3. 本地运行 (开发环境)
 
