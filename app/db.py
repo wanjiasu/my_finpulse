@@ -69,6 +69,18 @@ def init_db():
                 );
                 """
             )
+            # 同花顺板块成分表
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS stock_ths_member (
+                    ts_code TEXT NOT NULL,
+                    con_code TEXT NOT NULL,
+                    con_name TEXT,
+                    PRIMARY KEY (ts_code, con_code)
+                );
+                CREATE INDEX IF NOT EXISTS idx_ths_member_code ON stock_ths_member (con_code);
+                """
+            )
             conn.commit()
 
 

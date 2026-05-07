@@ -75,3 +75,25 @@ class SectorFetcher(TushareFetcher):
         except Exception as e:
             print(f"获取同花顺板块指数时发生错误: {e}")
             return None
+
+    def get_ths_member(self, ts_code: str = "", con_code: str = ""):
+        """
+        获取同花顺概念板块成分列表 (ths_member)。
+
+        参数:
+        ----------
+        ts_code : str, 可选
+            板块指数代码。
+        con_code : str, 可选
+            股票代码。
+        """
+        try:
+            df = self.call_with_retry(
+                self.pro.ths_member,
+                ts_code=ts_code,
+                con_code=con_code
+            )
+            return self._handle_data(df, f"get_ths_member({ts_code if ts_code else con_code})")
+        except Exception as e:
+            print(f"获取同花顺板块成分时发生错误: {e}")
+            return None

@@ -3,7 +3,7 @@ from fastapi import FastAPI, HTTPException
 from .settings import settings
 from .db import init_db, fetch_result
 from .data_fetcher import IndexFetcher, SectorFetcher, StockFetcher
-from .tasks import add, sync_stock_list_task, sync_history_data_task, sync_stock_data_by_day, sync_ths_index_task
+from .tasks import add, sync_stock_list_task, sync_history_data_task, sync_stock_data_by_day, sync_ths_index_task, sync_ths_member_task
 
 app = FastAPI(title=settings.APP_NAME)
 
@@ -68,3 +68,12 @@ def sync_ths_index(exchange: str = "A", index_type: str = ""):
     """
     task = sync_ths_index_task.delay(exchange=exchange, index_type=index_type)
     return {"celery_task_id": task.id, "state": task.state, "detail": "同花顺板块指数同步任务已启动"}
+
+
+@app.post("/sectors/ths_member/sync")
+def sync_ths_member(ts_code: str):
+    """
+    异步同步同花顺板块成分
+    """
+    task = sync_ths_member_task.delay(ts_code=ts_code)
+    return {"celery_task_id": task.id, "state": task.state, "detail": f"板块 {ts_code} 成分同步任务已启动"}

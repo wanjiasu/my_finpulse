@@ -67,6 +67,44 @@ def sync_ths_index_task(exchange: str = "A", index_type: str = ""):
 
 
 @celery.task(
+    name="tasks.sync_ths_member",
+    autoretry_for=(Exception,),
+    retry_kwargs={'max_retries': 3},
+    retry_backoff=60
+)
+def sync_ths_member_task(ts_code: str):
+    """
+    异步同步同花顺板块成分任务
+    """
+    fetcher = SectorFetcher()
+    df = fetcher.get_ths_member(ts_code=ts_code)
+    
+    if df is not None:
+        count = len(df)
+        # 将数据保存到数据库，采用 append 模式，但由于有复合主键，建议实际中使用 upsert 或先删后插
+        # 这里简单起见先 append，数据库主键会保证唯一性（如果冲突会报错，被 Celery 重试捕获）
+        # 更好的做法是 if_exists="append" 配合手动处理冲突，或者先删除该板块旧成分
+        from .db import engine
+        from sqlalchemy import text
+        with engine.connect() as conn:
+            conn.execute(text(f"DELETE FROM stock_ths_member WHERE ts_code = '{ts_code}'"))
+            conn.commit()
+            
+        success = fetcher.save_to_db(df[['ts_code', 'con_code', 'con_name']], "stock_ths_member", if_exists="append")
+        
+        if success:
+            result_msg = f"成功同步板块 {ts_code} 成分并入库，共 {count} 条记录。"
+        else:
+            result_msg = f"成功同步板块 {ts_code} 成分，但入库失败。"
+            
+        save_result(celery_task_id=sync_ths_member_task.request.id, result=result_msg)
+        return {"status": "success" if success else "failed", "ts_code": ts_code, "count": count}
+    
+    save_result(celery_task_id=sync_ths_member_task.request.id, result=f"同步板块 {ts_code} 成分失败。")
+    return {"status": "failed"}
+
+
+@celery.task(
     name="tasks.sync_stock_data_by_day",
     autoretry_for=(Exception,),
     retry_kwargs={'max_retries': 5},
