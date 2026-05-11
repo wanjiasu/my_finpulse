@@ -56,6 +56,28 @@ def init_db():
                 CREATE INDEX IF NOT EXISTS idx_stock_adj_date ON stock_adj_factor (trade_date);
                 """
             )
+            # 股票基础信息表
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS stock_basic (
+                    ts_code TEXT PRIMARY KEY,
+                    symbol TEXT,
+                    name TEXT,
+                    area TEXT,
+                    industry TEXT,
+                    fullname TEXT,
+                    enname TEXT,
+                    cnspell TEXT,
+                    market TEXT,
+                    exchange TEXT,
+                    curr TEXT,
+                    list_status TEXT,
+                    list_date TEXT,
+                    delist_date TEXT,
+                    is_hs TEXT
+                );
+                """
+            )
             # 同花顺指数表
             cur.execute(
                 """

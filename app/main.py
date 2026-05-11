@@ -1,11 +1,20 @@
 from datetime import datetime
 from fastapi import FastAPI, HTTPException
+from scalar_fastapi import get_scalar_api_reference
 from .settings import settings
 from .db import init_db, fetch_result
 from .data_fetcher import IndexFetcher, SectorFetcher, StockFetcher
 from .tasks import add, sync_stock_list_task, sync_history_data_task, sync_stock_data_by_day, sync_ths_index_task, sync_ths_member_task
 
 app = FastAPI(title=settings.APP_NAME)
+
+
+@app.get("/docs/scalar", include_in_schema=False)
+async def scalar_html():
+    return get_scalar_api_reference(
+        openapi_url=app.openapi_url,
+        title=app.title,
+    )
 
 
 @app.on_event("startup")
@@ -30,6 +39,37 @@ def get_task_result(task_id: str):
     if not row:
         return {"celery_task_id": task_id, "db_result": None, "hint": "任务可能还没跑完，或还没写入数据库"}
     return row
+
+
+@app.get("/stocks/list")
+def get_stocks(
+    ts_code: str = "",
+    name: str = "",
+    market: str = "",
+    list_status: str = "L",
+    exchange: str = "",
+    is_hs: str = ""
+):
+    """
+    直接获取全市场股票基础信息列表 (Tushare API)
+    """
+    fetcher = StockFetcher()
+    df = fetcher.get_stock_list(
+        ts_code=ts_code,
+        name=name,
+        market=market,
+        list_status=list_status,
+        exchange=exchange,
+        is_hs=is_hs
+    )
+    if df is None:
+        raise HTTPException(status_code=500, detail="获取股票列表失败")
+
+    # 将数据保存到数据库 (stock_basic 表)
+    fetcher.save_to_db(df, "stock_basic", if_exists="replace")
+
+    # 将 DataFrame 转换为字典列表返回
+    return df.to_dict(orient="records")
 
 
 @app.post("/stocks/sync")
