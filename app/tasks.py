@@ -1,8 +1,11 @@
 import time
 from datetime import datetime, timedelta
 from .celery_app import celery
-from .db import save_result
+from .db import save_result, init_db
 from .data_fetcher import StockFetcher, IndexFetcher, SectorFetcher
+
+# 确保数据库表已创建
+init_db()
 
 
 @celery.task(name="tasks.add")
@@ -28,9 +31,16 @@ def sync_stock_list_task(market: str = "", list_status: str = "L"):
     
     if df is not None:
         count = len(df)
-        result_msg = f"成功同步股票列表，共 {count} 只股票。"
+        # 将数据保存到数据库 (stock_basic 表)
+        success = fetcher.save_to_db(df, "stock_basic", if_exists="replace")
+        
+        if success:
+            result_msg = f"成功同步股票列表并入库，共 {count} 只股票。"
+        else:
+            result_msg = f"成功同步股票列表，但入库失败。共 {count} 只股票。"
+            
         save_result(celery_task_id=sync_stock_list_task.request.id, result=result_msg)
-        return {"status": "success", "count": count}
+        return {"status": "success" if success else "partial_success", "count": count}
     
     save_result(celery_task_id=sync_stock_list_task.request.id, result="同步股票列表失败。")
     return {"status": "failed"}

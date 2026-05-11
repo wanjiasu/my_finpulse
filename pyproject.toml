@@ -1,5 +1,5 @@
 [project]
-name = "test-fastapi-celery"
+name = "finpulse-fastapi-celery"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
