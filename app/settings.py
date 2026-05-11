@@ -4,7 +4,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    APP_NAME: str = "demo-fastapi-celery"
+    APP_NAME: str = "finpulse-fastapi-celery"
 
     REDIS_URL: str
     CELERY_BROKER_URL: str
