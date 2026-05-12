@@ -41,6 +41,15 @@ services:
       - redis
     restart: unless-stopped
 
+  beat:
+    build: .
+    container_name: finpulse_beat
+    env_file: .env
+    command: celery -A app.celery_app.celery beat -l info
+    depends_on:
+      - redis
+    restart: unless-stopped
+
   flower:
     build: .
     container_name: finpulse_flower

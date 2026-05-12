@@ -114,6 +114,23 @@ def sync_ths_member_task(ts_code: str):
     return {"status": "failed"}
 
 
+@celery.task(name="tasks.sync_daily_automatic")
+def sync_daily_automatic():
+    """
+    每日定时执行的任务：同步股票列表和最新一天行情
+    """
+    today = datetime.now().strftime("%Y%m%d")
+    print(f"开始执行每日自动同步任务，日期: {today}")
+    
+    # 1. 同步股票列表
+    sync_stock_list_task.delay()
+    
+    # 2. 同步当日行情
+    sync_stock_data_by_day.delay(trade_date=today)
+    
+    return {"status": "triggered", "date": today}
+
+
 @celery.task(
     name="tasks.sync_stock_data_by_day",
     autoretry_for=(Exception,),
