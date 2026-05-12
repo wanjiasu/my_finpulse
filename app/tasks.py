@@ -125,16 +125,32 @@ def sync_stock_data_by_day(trade_date: str):
     同步某一天的行情和复权因子
     """
     fetcher = StockFetcher()
+    from .db import engine
+    from sqlalchemy import text
     
     print(f"开始同步 {trade_date} 的全市场数据...")
     
     # 1. 获取行情
     daily_df = fetcher.get_stock_daily(trade_date=trade_date)
-    daily_success = fetcher.save_to_db(daily_df, "stock_daily")
+    if daily_df is not None and not daily_df.empty:
+        # 先删除已存在的同日期数据，防止主键冲突
+        with engine.connect() as conn:
+            conn.execute(text(f"DELETE FROM stock_daily WHERE trade_date = '{trade_date}'"))
+            conn.commit()
+        daily_success = fetcher.save_to_db(daily_df, "stock_daily", if_exists="append")
+    else:
+        daily_success = False
     
     # 2. 获取复权因子
     adj_df = fetcher.get_adj_factor(trade_date=trade_date)
-    adj_success = fetcher.save_to_db(adj_df, "stock_adj_factor")
+    if adj_df is not None and not adj_df.empty:
+        # 先删除已存在的同日期数据
+        with engine.connect() as conn:
+            conn.execute(text(f"DELETE FROM stock_adj_factor WHERE trade_date = '{trade_date}'"))
+            conn.commit()
+        adj_success = fetcher.save_to_db(adj_df, "stock_adj_factor", if_exists="append")
+    else:
+        adj_success = False
     
     result_msg = f"日期 {trade_date}: 行情入库{'成功' if daily_success else '失败'}, 复权因子入库{'成功' if adj_success else '失败'}"
     return {"date": trade_date, "msg": result_msg}

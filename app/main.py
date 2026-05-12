@@ -1,5 +1,5 @@
 from datetime import datetime
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from scalar_fastapi import get_scalar_api_reference
 from .settings import settings
 from .db import init_db, fetch_result
@@ -73,27 +73,35 @@ def get_stocks(
 
 
 @app.post("/stocks/sync")
-def sync_stocks(market: str = "", list_status: str = "L"):
+def sync_stocks(
+    market: str = Query("", description="市场代码: 主板, 创业板, 科创板, 北交所"), 
+    list_status: str = Query("L", description="上市状态: L上市, D退市, P暂停上市")
+):
     """
-    异步同步股票列表任务
+    异步同步全市场股票基础信息列表
     """
     task = sync_stock_list_task.delay(market=market, list_status=list_status)
     return {"celery_task_id": task.id, "state": task.state, "detail": "同步任务已在后台启动"}
 
 
 @app.post("/stocks/sync_history")
-def sync_history(start_date: str = "20180101", end_date: str = None):
+def sync_history(
+    start_date: str = Query("20180101", description="开始日期 (YYYYMMDD)"), 
+    end_date: str = Query(None, description="结束日期 (YYYYMMDD), 默认为昨天")
+):
     """
-    异步同步历史行情与复权因子 (按天循环)
+    异步同步历史行情与复权因子 (按交易日历循环)
     """
     task = sync_history_data_task.delay(start_date=start_date, end_date=end_date)
     return {"celery_task_id": task.id, "state": task.state, "detail": "历史同步任务已启动，请通过 ID 查询进度"}
 
 
 @app.post("/stocks/sync_daily")
-def sync_daily(trade_date: str = None):
+def sync_daily(
+    trade_date: str = Query(None, description="交易日期 (YYYYMMDD), 默认为当天")
+):
     """
-    异步同步指定日期的全市场数据
+    异步同步指定日期的全市场行情数据
     """
     if not trade_date:
         trade_date = datetime.now().strftime("%Y%m%d")
@@ -102,7 +110,10 @@ def sync_daily(trade_date: str = None):
 
 
 @app.post("/sectors/ths_index/sync")
-def sync_ths_index(exchange: str = "A", index_type: str = ""):
+def sync_ths_index(
+    exchange: str = Query("A", description="交易所: A-中信/同花顺, SSE-上交所, SZSE-深交所"), 
+    index_type: str = Query("", description="指数类型: N-板块, I-指数")
+):
     """
     异步同步同花顺板块指数
     """
@@ -111,7 +122,9 @@ def sync_ths_index(exchange: str = "A", index_type: str = ""):
 
 
 @app.post("/sectors/ths_member/sync")
-def sync_ths_member(ts_code: str):
+def sync_ths_member(
+    ts_code: str = Query(..., description="板块指数代码 (例如: 885757.TI)")
+):
     """
     异步同步同花顺板块成分
     """
