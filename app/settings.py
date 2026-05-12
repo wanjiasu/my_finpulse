@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     POSTGRES_DSN: str
 
     TUSHARE_TOKEN: str = ""
+    TUSHARE_HTTP_URL: str = "http://101.35.233.113:8020/"
 
 
 settings = Settings()

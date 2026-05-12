@@ -8,16 +8,18 @@ class TushareFetcher:
     """
     Tushare 数据获取基类
     """
-    def __init__(self, token: str = None, http_url: str = "http://101.35.233.113:8020/"):
+    def __init__(self, token: str = None, http_url: str = None):
         load_dotenv()
         self.token = token or os.getenv("TUSHARE_TOKEN")
+        self.http_url = http_url or os.getenv("TUSHARE_HTTP_URL", "http://101.35.233.113:8020/")
+        
         if not self.token:
             raise ValueError("错误: 未找到 TUSHARE_TOKEN。请在 .env 文件中设置或在初始化时提供。")
         
         # 初始化 Pro API
         self.pro = ts.pro_api(self.token)
         # 设置自定义 HTTP URL
-        self.pro._DataApi__http_url = http_url
+        self.pro._DataApi__http_url = self.http_url
         
     def call_with_retry(self, api_func, max_retries=3, retry_wait=60, **kwargs):
         """
