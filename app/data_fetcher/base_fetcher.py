@@ -11,15 +11,19 @@ class TushareFetcher:
     def __init__(self, token: str = None, http_url: str = None):
         load_dotenv()
         self.token = token or os.getenv("TUSHARE_TOKEN")
-        self.http_url = http_url or os.getenv("TUSHARE_HTTP_URL", "http://101.35.233.113:8020/")
+        self.http_url = http_url or os.getenv("TUSHARE_HTTP_URL")
         
         if not self.token:
             raise ValueError("错误: 未找到 TUSHARE_TOKEN。请在 .env 文件中设置或在初始化时提供。")
         
         # 初始化 Pro API
         self.pro = ts.pro_api(self.token)
-        # 设置自定义 HTTP URL
-        self.pro._DataApi__http_url = self.http_url
+        
+        # 如果设置了非官方的自定义地址，则进行覆盖
+        # 注意：官方地址不需要手动设置，SDK 默认就是 https://api.tushare.pro
+        if self.http_url and "tushare.pro" not in self.http_url:
+            print(f"[{self.__class__.__name__}] 检测到自定义 Tushare 地址: {self.http_url}")
+            self.pro._DataApi__http_url = self.http_url
         
     def call_with_retry(self, api_func, max_retries=3, retry_wait=60, **kwargs):
         """
@@ -50,7 +54,7 @@ class TushareFetcher:
                         continue
                 
                 # 其他不可重试的错误直接抛出或记录
-                print(f"API 调用发生非限流错误: {e}")
+                print(f"API 调用发生错误: {error_msg}")
                 raise e
         return None
 

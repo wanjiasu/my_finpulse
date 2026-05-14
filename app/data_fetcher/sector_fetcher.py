@@ -19,15 +19,18 @@ class SectorFetcher(TushareFetcher):
         limit_type : str, 可选
             板单类别：涨停池、连扳池、冲刺涨停、炸板池、跌停池。默认：涨停池。
         """
+        params = {}
+        if trade_date: params['trade_date'] = trade_date
+        if limit_type: params['limit_type'] = limit_type
+        if ts_code: params['ts_code'] = ts_code
+        if market: params['market'] = market
+        if start_date: params['start_date'] = start_date
+        if end_date: params['end_date'] = end_date
+
         try:
             df = self.call_with_retry(
                 self.pro.limit_list_ths,
-                trade_date=trade_date,
-                limit_type=limit_type,
-                ts_code=ts_code,
-                market=market,
-                start_date=start_date,
-                end_date=end_date
+                **params
             )
             return self._handle_data(df, f"get_limit_list({limit_type})")
         except Exception as e:
@@ -38,13 +41,16 @@ class SectorFetcher(TushareFetcher):
         """
         获取每天涨停股票最多最强的概念板块 (limit_cpt_list)。
         """
+        params = {}
+        if trade_date: params['trade_date'] = trade_date
+        if ts_code: params['ts_code'] = ts_code
+        if start_date: params['start_date'] = start_date
+        if end_date: params['end_date'] = end_date
+
         try:
             df = self.call_with_retry(
                 self.pro.limit_cpt_list,
-                trade_date=trade_date,
-                ts_code=ts_code,
-                start_date=start_date,
-                end_date=end_date
+                **params
             )
             return self._handle_data(df, "get_limit_cpt_list")
         except Exception as e:
@@ -64,12 +70,15 @@ class SectorFetcher(TushareFetcher):
         index_type : str, 可选
             指数类型：N-概念指数, I-行业指数, R-地域指数, S-同花顺特色指数, ST-同花顺风格指数, TH-同花顺主题指数, BB-同花顺宽基指数。
         """
+        params = {}
+        if ts_code: params['ts_code'] = ts_code
+        if exchange: params['exchange'] = exchange
+        if index_type: params['type'] = index_type
+
         try:
             df = self.call_with_retry(
                 self.pro.ths_index,
-                ts_code=ts_code,
-                exchange=exchange,
-                type=index_type
+                **params
             )
             return self._handle_data(df, "get_ths_index")
         except Exception as e:
@@ -87,11 +96,14 @@ class SectorFetcher(TushareFetcher):
         con_code : str, 可选
             股票代码。
         """
+        params = {}
+        if ts_code: params['ts_code'] = ts_code
+        if con_code: params['con_code'] = con_code
+
         try:
             df = self.call_with_retry(
                 self.pro.ths_member,
-                ts_code=ts_code,
-                con_code=con_code
+                **params
             )
             return self._handle_data(df, f"get_ths_member({ts_code if ts_code else con_code})")
         except Exception as e:

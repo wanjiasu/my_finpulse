@@ -35,12 +35,14 @@ class IndexFetcher(TushareFetcher):
         try:
             df_list = []
             for code in ts_codes:
+                params = {'ts_code': code}
+                if start_date: params['start_date'] = start_date
+                if end_date: params['end_date'] = end_date
+                if limit: params['limit'] = limit
+
                 df = self.call_with_retry(
                     self.pro.index_daily,
-                    ts_code=code, 
-                    start_date=start_date, 
-                    end_date=end_date, 
-                    limit=limit
+                    **params
                 )
                 if df is not None and not df.empty:
                     df_list.append(df)

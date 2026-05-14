@@ -12,15 +12,19 @@ class StockFetcher(TushareFetcher):
         """
         获取全市场股票基础信息列表 (stock_basic)。
         """
+        # 构建非空参数字典
+        params = {}
+        if ts_code: params['ts_code'] = ts_code
+        if name: params['name'] = name
+        if market: params['market'] = market
+        if list_status: params['list_status'] = list_status
+        if exchange: params['exchange'] = exchange
+        if is_hs: params['is_hs'] = is_hs
+
         try:
             df = self.call_with_retry(
                 self.pro.stock_basic,
-                ts_code=ts_code,
-                name=name,
-                market=market,
-                list_status=list_status,
-                exchange=exchange,
-                is_hs=is_hs
+                **params
             )
             return self._handle_data(df, "get_stock_list")
         except Exception as e:
@@ -48,13 +52,16 @@ class StockFetcher(TushareFetcher):
         """
         获取股票日线行情数据 (daily)。
         """
+        params = {}
+        if ts_code: params['ts_code'] = ts_code
+        if trade_date: params['trade_date'] = trade_date
+        if start_date: params['start_date'] = start_date
+        if end_date: params['end_date'] = end_date
+
         try:
             df = self.call_with_retry(
                 self.pro.daily,
-                ts_code=ts_code,
-                trade_date=trade_date,
-                start_date=start_date,
-                end_date=end_date
+                **params
             )
             return self._handle_data(df, f"get_stock_daily({ts_code if ts_code else '全市场'})")
         except Exception as e:
@@ -65,13 +72,16 @@ class StockFetcher(TushareFetcher):
         """
         获取股票复权因子数据 (adj_factor)。
         """
+        params = {}
+        if ts_code: params['ts_code'] = ts_code
+        if trade_date: params['trade_date'] = trade_date
+        if start_date: params['start_date'] = start_date
+        if end_date: params['end_date'] = end_date
+
         try:
             df = self.call_with_retry(
                 self.pro.adj_factor,
-                ts_code=ts_code,
-                trade_date=trade_date,
-                start_date=start_date,
-                end_date=end_date
+                **params
             )
             return self._handle_data(df, f"get_adj_factor({ts_code if ts_code else '全市场'})")
         except Exception as e:
