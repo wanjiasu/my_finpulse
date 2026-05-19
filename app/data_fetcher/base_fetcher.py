@@ -46,7 +46,8 @@ class TushareFetcher:
             except Exception as e:
                 error_msg = str(e)
                 # 识别频率限制错误 (Tushare 常见的报错关键字)
-                if "抱歉，您每分钟最多访问" in error_msg or "每分钟最多访问" in error_msg or "接口限流" in error_msg:
+                limit_keywords = ["抱歉，您每分钟最多访问", "每分钟最多访问", "接口限流", "频率超限", "访问过于频繁"]
+                if any(k in error_msg for k in limit_keywords):
                     retries += 1
                     if retries <= max_retries:
                         print(f"触发 Tushare 频率限制，等待 {retry_wait} 秒后进行第 {retries} 次重试... (错误: {error_msg})")

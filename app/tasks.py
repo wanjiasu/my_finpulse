@@ -125,7 +125,11 @@ def sync_daily_automatic():
     # 1. 同步股票列表
     sync_stock_list_task.delay()
     
-    # 2. 同步当日行情
+    # 2. 延迟几秒再启动行情同步，避免同时请求 Tushare 触发频率限制
+    import time
+    time.sleep(5)
+    
+    # 3. 同步当日行情
     sync_stock_data_by_day.delay(trade_date=today)
     
     return {"status": "triggered", "date": today}
@@ -156,7 +160,8 @@ def sync_stock_data_by_day(trade_date: str):
             conn.commit()
         daily_success = fetcher.save_to_db(daily_df, "stock_daily", if_exists="append")
     else:
-        daily_success = False
+        # 如果是交易日但没拿数据，抛出异常让 Celery 重试
+        raise Exception(f"未能获取到 {trade_date} 的日线行情数据，可能接口限流或数据未更新")
     
     # 2. 获取复权因子
     adj_df = fetcher.get_adj_factor(trade_date=trade_date)
@@ -167,9 +172,10 @@ def sync_stock_data_by_day(trade_date: str):
             conn.commit()
         adj_success = fetcher.save_to_db(adj_df, "stock_adj_factor", if_exists="append")
     else:
-        adj_success = False
+        # 复权因子缺失也抛出异常
+        raise Exception(f"未能获取到 {trade_date} 的复权因子数据")
     
-    result_msg = f"日期 {trade_date}: 行情入库{'成功' if daily_success else '失败'}, 复权因子入库{'成功' if adj_success else '失败'}"
+    result_msg = f"日期 {trade_date}: 行情入库成功, 复权因子入库成功"
     return {"date": trade_date, "msg": result_msg}
 
 
