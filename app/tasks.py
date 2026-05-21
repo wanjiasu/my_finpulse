@@ -2,7 +2,7 @@ import time
 from datetime import datetime, timedelta
 from .celery_app import celery
 from .db import save_result, init_db
-from .data_fetcher import StockFetcher, IndexFetcher, SectorFetcher
+from .data_fetcher import StockFetcher, IndexFetcher, SectorFetcher, MoneyflowFetcher
 
 # 确保数据库表已创建
 init_db()
@@ -177,6 +177,81 @@ def sync_stock_data_by_day(trade_date: str):
     
     result_msg = f"日期 {trade_date}: 行情入库成功, 复权因子入库成功"
     return {"date": trade_date, "msg": result_msg}
+
+
+@celery.task(
+    name="tasks.sync_moneyflow_by_day",
+    autoretry_for=(Exception,),
+    retry_kwargs={'max_retries': 5},
+    retry_backoff=60
+)
+def sync_moneyflow_by_day_task(trade_date: str):
+    """
+    同步某一天的股票资金流向
+    """
+    fetcher = MoneyflowFetcher()
+    from .db import engine
+    from sqlalchemy import text
+    
+    print(f"开始同步 {trade_date} 的全市场资金流向数据...")
+    
+    df = fetcher.get_moneyflow(trade_date=trade_date)
+    if df is not None and not df.empty:
+        # 先删除已存在的同日期数据
+        with engine.connect() as conn:
+            conn.execute(text(f"DELETE FROM stock_moneyflow WHERE trade_date = '{trade_date}'"))
+            conn.commit()
+        success = fetcher.save_to_db(df, "stock_moneyflow", if_exists="append")
+        if success:
+            result_msg = f"日期 {trade_date}: 资金流向入库成功，共 {len(df)} 条记录"
+            return {"date": trade_date, "status": "success", "msg": result_msg}
+        else:
+            raise Exception(f"日期 {trade_date}: 资金流向入库失败")
+    else:
+        # 可能是交易日但没数据，或者非交易日
+        print(f"日期 {trade_date}: 未能获取到资金流向数据")
+        return {"date": trade_date, "status": "no_data", "msg": "未能获取到数据"}
+
+
+@celery.task(name="tasks.sync_moneyflow_history")
+def sync_moneyflow_history_task(start_date: str = "20180101", end_date: str = None):
+    """
+    按天循环同步历史资金流向
+    """
+    fetcher = StockFetcher() # 使用 StockFetcher 获取交易日历
+    
+    if end_date is None:
+        end_date = (datetime.now() - timedelta(days=1)).strftime("%Y%m%d")
+        
+    cal_df = fetcher.get_trade_cal(start_date=start_date, end_date=end_date)
+    if cal_df is None or cal_df.empty:
+        save_result(celery_task_id=sync_moneyflow_history_task.request.id, result="获取交易日历失败。")
+        return {"status": "failed", "reason": "no trade calendar"}
+    
+    trade_days = cal_df['cal_date'].tolist()
+    total_days = len(trade_days)
+    
+    save_result(celery_task_id=sync_moneyflow_history_task.request.id, result=f"资金流向历史同步启动: {start_date} -> {end_date}, 共 {total_days} 个交易日。")
+    
+    success_count = 0
+    for i, td in enumerate(trade_days):
+        try:
+            # 直接调用单日同步函数（同步执行），以便控制频率
+            res = sync_moneyflow_by_day_task(td)
+            if res.get("status") == "success":
+                success_count += 1
+            
+            if i % 10 == 0:
+                progress_msg = f"资金流向进度: {i}/{total_days}, 当前日期: {td}, 已成功同步 {success_count} 天。"
+                save_result(celery_task_id=sync_moneyflow_history_task.request.id, result=progress_msg)
+            
+            time.sleep(1) # 频率控制
+        except Exception as e:
+            print(f"同步资金流向日期 {td} 时发生错误: {e}")
+            
+    final_msg = f"资金流向历史同步完成! 共处理 {total_days} 个交易日，成功 {success_count} 天。"
+    save_result(celery_task_id=sync_moneyflow_history_task.request.id, result=final_msg)
+    return {"status": "completed", "total": total_days, "success": success_count}
 
 
 @celery.task(name="tasks.sync_history_data")

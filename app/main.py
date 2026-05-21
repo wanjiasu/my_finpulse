@@ -3,8 +3,17 @@ from fastapi import FastAPI, HTTPException, Query
 from scalar_fastapi import get_scalar_api_reference
 from .settings import settings
 from .db import init_db, fetch_result
-from .data_fetcher import IndexFetcher, SectorFetcher, StockFetcher
-from .tasks import add, sync_stock_list_task, sync_history_data_task, sync_stock_data_by_day, sync_ths_index_task, sync_ths_member_task
+from .data_fetcher import IndexFetcher, SectorFetcher, StockFetcher, MoneyflowFetcher
+from .tasks import (
+    add, 
+    sync_stock_list_task, 
+    sync_history_data_task, 
+    sync_stock_data_by_day, 
+    sync_ths_index_task, 
+    sync_ths_member_task,
+    sync_moneyflow_by_day_task,
+    sync_moneyflow_history_task
+)
 
 app = FastAPI(title=settings.APP_NAME)
 
@@ -107,6 +116,31 @@ def sync_daily(
         trade_date = datetime.now().strftime("%Y%m%d")
     task = sync_stock_data_by_day.delay(trade_date=trade_date)
     return {"celery_task_id": task.id, "state": task.state, "detail": f"{trade_date} 同步任务已启动"}
+
+
+@app.post("/stocks/moneyflow/sync")
+def sync_moneyflow(
+    trade_date: str = Query(None, description="交易日期 (YYYYMMDD), 默认为当天")
+):
+    """
+    异步同步指定日期的全市场个股资金流向数据
+    """
+    if not trade_date:
+        trade_date = datetime.now().strftime("%Y%m%d")
+    task = sync_moneyflow_by_day_task.delay(trade_date=trade_date)
+    return {"celery_task_id": task.id, "state": task.state, "detail": f"{trade_date} 资金流向同步任务已启动"}
+
+
+@app.post("/stocks/moneyflow/sync_history")
+def sync_moneyflow_history(
+    start_date: str = Query("20180101", description="开始日期 (YYYYMMDD)"), 
+    end_date: str = Query(None, description="结束日期 (YYYYMMDD), 默认为昨天")
+):
+    """
+    异步同步历史个股资金流向 (按交易日历循环)
+    """
+    task = sync_moneyflow_history_task.delay(start_date=start_date, end_date=end_date)
+    return {"celery_task_id": task.id, "state": task.state, "detail": "资金流向历史同步任务已启动"}
 
 
 @app.post("/sectors/ths_index/sync")

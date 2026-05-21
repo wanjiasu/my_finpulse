@@ -103,6 +103,35 @@ def init_db():
                 CREATE INDEX IF NOT EXISTS idx_ths_member_code ON stock_ths_member (con_code);
                 """
             )
+            # 个股资金流向表
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS stock_moneyflow (
+                    ts_code TEXT NOT NULL,
+                    trade_date TEXT NOT NULL,
+                    buy_sm_vol BIGINT,
+                    buy_sm_amount FLOAT,
+                    sell_sm_vol BIGINT,
+                    sell_sm_amount FLOAT,
+                    buy_md_vol BIGINT,
+                    buy_md_amount FLOAT,
+                    sell_md_vol BIGINT,
+                    sell_md_amount FLOAT,
+                    buy_lg_vol BIGINT,
+                    buy_lg_amount FLOAT,
+                    sell_lg_vol BIGINT,
+                    sell_lg_amount FLOAT,
+                    buy_elg_vol BIGINT,
+                    buy_elg_amount FLOAT,
+                    sell_elg_vol BIGINT,
+                    sell_elg_amount FLOAT,
+                    net_mf_vol BIGINT,
+                    net_mf_amount FLOAT,
+                    PRIMARY KEY (ts_code, trade_date)
+                );
+                CREATE INDEX IF NOT EXISTS idx_stock_moneyflow_date ON stock_moneyflow (trade_date);
+                """
+            )
             conn.commit()
 
 
