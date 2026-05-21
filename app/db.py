@@ -35,17 +35,18 @@ def init_db():
                 CREATE TABLE IF NOT EXISTS stock_daily (
                     ts_code TEXT NOT NULL,
                     trade_date TEXT NOT NULL,
-                    open FLOAT,
-                    high FLOAT,
-                    low FLOAT,
-                    close FLOAT,
-                    pre_close FLOAT,
-                    change FLOAT,
-                    pct_chg FLOAT,
-                    vol FLOAT,
-                    amount FLOAT,
                     PRIMARY KEY (ts_code, trade_date)
                 );
+                ALTER TABLE stock_daily ADD COLUMN IF NOT EXISTS open FLOAT;
+                ALTER TABLE stock_daily ADD COLUMN IF NOT EXISTS high FLOAT;
+                ALTER TABLE stock_daily ADD COLUMN IF NOT EXISTS low FLOAT;
+                ALTER TABLE stock_daily ADD COLUMN IF NOT EXISTS close FLOAT;
+                ALTER TABLE stock_daily ADD COLUMN IF NOT EXISTS pre_close FLOAT;
+                ALTER TABLE stock_daily ADD COLUMN IF NOT EXISTS change FLOAT;
+                ALTER TABLE stock_daily ADD COLUMN IF NOT EXISTS pct_chg FLOAT;
+                ALTER TABLE stock_daily ADD COLUMN IF NOT EXISTS vol FLOAT;
+                ALTER TABLE stock_daily ADD COLUMN IF NOT EXISTS amount FLOAT;
+
                 CREATE INDEX IF NOT EXISTS idx_stock_daily_date ON stock_daily (trade_date);
                 COMMENT ON TABLE stock_daily IS '股票日线行情表';
                 COMMENT ON COLUMN stock_daily.ts_code IS 'TS股票代码';
@@ -67,9 +68,10 @@ def init_db():
                 CREATE TABLE IF NOT EXISTS stock_adj_factor (
                     ts_code TEXT NOT NULL,
                     trade_date TEXT NOT NULL,
-                    adj_factor FLOAT,
                     PRIMARY KEY (ts_code, trade_date)
                 );
+                ALTER TABLE stock_adj_factor ADD COLUMN IF NOT EXISTS adj_factor FLOAT;
+
                 CREATE INDEX IF NOT EXISTS idx_stock_adj_date ON stock_adj_factor (trade_date);
                 COMMENT ON TABLE stock_adj_factor IS '股票复权因子表';
                 COMMENT ON COLUMN stock_adj_factor.ts_code IS 'TS股票代码';
@@ -81,22 +83,23 @@ def init_db():
             cur.execute(
                 """
                 CREATE TABLE IF NOT EXISTS stock_basic (
-                    ts_code TEXT PRIMARY KEY,
-                    symbol TEXT,
-                    name TEXT,
-                    area TEXT,
-                    industry TEXT,
-                    fullname TEXT,
-                    enname TEXT,
-                    cnspell TEXT,
-                    market TEXT,
-                    exchange TEXT,
-                    curr TEXT,
-                    list_status TEXT,
-                    list_date TEXT,
-                    delist_date TEXT,
-                    is_hs TEXT
+                    ts_code TEXT PRIMARY KEY
                 );
+                ALTER TABLE stock_basic ADD COLUMN IF NOT EXISTS symbol TEXT;
+                ALTER TABLE stock_basic ADD COLUMN IF NOT EXISTS name TEXT;
+                ALTER TABLE stock_basic ADD COLUMN IF NOT EXISTS area TEXT;
+                ALTER TABLE stock_basic ADD COLUMN IF NOT EXISTS industry TEXT;
+                ALTER TABLE stock_basic ADD COLUMN IF NOT EXISTS fullname TEXT;
+                ALTER TABLE stock_basic ADD COLUMN IF NOT EXISTS enname TEXT;
+                ALTER TABLE stock_basic ADD COLUMN IF NOT EXISTS cnspell TEXT;
+                ALTER TABLE stock_basic ADD COLUMN IF NOT EXISTS market TEXT;
+                ALTER TABLE stock_basic ADD COLUMN IF NOT EXISTS exchange TEXT;
+                ALTER TABLE stock_basic ADD COLUMN IF NOT EXISTS curr TEXT;
+                ALTER TABLE stock_basic ADD COLUMN IF NOT EXISTS list_status TEXT;
+                ALTER TABLE stock_basic ADD COLUMN IF NOT EXISTS list_date TEXT;
+                ALTER TABLE stock_basic ADD COLUMN IF NOT EXISTS delist_date TEXT;
+                ALTER TABLE stock_basic ADD COLUMN IF NOT EXISTS is_hs TEXT;
+
                 COMMENT ON TABLE stock_basic IS '股票基础信息表';
                 COMMENT ON COLUMN stock_basic.ts_code IS 'TS代码';
                 COMMENT ON COLUMN stock_basic.symbol IS '股票代码';
@@ -119,13 +122,14 @@ def init_db():
             cur.execute(
                 """
                 CREATE TABLE IF NOT EXISTS stock_ths_index (
-                    ts_code TEXT PRIMARY KEY,
-                    name TEXT,
-                    count INTEGER,
-                    exchange TEXT,
-                    list_date TEXT,
-                    type TEXT
+                    ts_code TEXT PRIMARY KEY
                 );
+                ALTER TABLE stock_ths_index ADD COLUMN IF NOT EXISTS name TEXT;
+                ALTER TABLE stock_ths_index ADD COLUMN IF NOT EXISTS count INTEGER;
+                ALTER TABLE stock_ths_index ADD COLUMN IF NOT EXISTS exchange TEXT;
+                ALTER TABLE stock_ths_index ADD COLUMN IF NOT EXISTS list_date TEXT;
+                ALTER TABLE stock_ths_index ADD COLUMN IF NOT EXISTS type TEXT;
+
                 COMMENT ON TABLE stock_ths_index IS '同花顺板块指数表';
                 COMMENT ON COLUMN stock_ths_index.ts_code IS '指数代码';
                 COMMENT ON COLUMN stock_ths_index.name IS '指数名称';
@@ -141,9 +145,10 @@ def init_db():
                 CREATE TABLE IF NOT EXISTS stock_ths_member (
                     ts_code TEXT NOT NULL,
                     con_code TEXT NOT NULL,
-                    con_name TEXT,
                     PRIMARY KEY (ts_code, con_code)
                 );
+                ALTER TABLE stock_ths_member ADD COLUMN IF NOT EXISTS con_name TEXT;
+
                 CREATE INDEX IF NOT EXISTS idx_ths_member_code ON stock_ths_member (con_code);
                 COMMENT ON TABLE stock_ths_member IS '同花顺板块成分表';
                 COMMENT ON COLUMN stock_ths_member.ts_code IS '板块指数代码';
@@ -157,26 +162,27 @@ def init_db():
                 CREATE TABLE IF NOT EXISTS stock_moneyflow (
                     ts_code TEXT NOT NULL,
                     trade_date TEXT NOT NULL,
-                    buy_sm_vol BIGINT,
-                    buy_sm_amount FLOAT,
-                    sell_sm_vol BIGINT,
-                    sell_sm_amount FLOAT,
-                    buy_md_vol BIGINT,
-                    buy_md_amount FLOAT,
-                    sell_md_vol BIGINT,
-                    sell_md_amount FLOAT,
-                    buy_lg_vol BIGINT,
-                    buy_lg_amount FLOAT,
-                    sell_lg_vol BIGINT,
-                    sell_lg_amount FLOAT,
-                    buy_elg_vol BIGINT,
-                    buy_elg_amount FLOAT,
-                    sell_elg_vol BIGINT,
-                    sell_elg_amount FLOAT,
-                    net_mf_vol BIGINT,
-                    net_mf_amount FLOAT,
                     PRIMARY KEY (ts_code, trade_date)
                 );
+                ALTER TABLE stock_moneyflow ADD COLUMN IF NOT EXISTS buy_sm_vol BIGINT;
+                ALTER TABLE stock_moneyflow ADD COLUMN IF NOT EXISTS buy_sm_amount FLOAT;
+                ALTER TABLE stock_moneyflow ADD COLUMN IF NOT EXISTS sell_sm_vol BIGINT;
+                ALTER TABLE stock_moneyflow ADD COLUMN IF NOT EXISTS sell_sm_amount FLOAT;
+                ALTER TABLE stock_moneyflow ADD COLUMN IF NOT EXISTS buy_md_vol BIGINT;
+                ALTER TABLE stock_moneyflow ADD COLUMN IF NOT EXISTS buy_md_amount FLOAT;
+                ALTER TABLE stock_moneyflow ADD COLUMN IF NOT EXISTS sell_md_vol BIGINT;
+                ALTER TABLE stock_moneyflow ADD COLUMN IF NOT EXISTS sell_md_amount FLOAT;
+                ALTER TABLE stock_moneyflow ADD COLUMN IF NOT EXISTS buy_lg_vol BIGINT;
+                ALTER TABLE stock_moneyflow ADD COLUMN IF NOT EXISTS buy_lg_amount FLOAT;
+                ALTER TABLE stock_moneyflow ADD COLUMN IF NOT EXISTS sell_lg_vol BIGINT;
+                ALTER TABLE stock_moneyflow ADD COLUMN IF NOT EXISTS sell_lg_amount FLOAT;
+                ALTER TABLE stock_moneyflow ADD COLUMN IF NOT EXISTS buy_elg_vol BIGINT;
+                ALTER TABLE stock_moneyflow ADD COLUMN IF NOT EXISTS buy_elg_amount FLOAT;
+                ALTER TABLE stock_moneyflow ADD COLUMN IF NOT EXISTS sell_elg_vol BIGINT;
+                ALTER TABLE stock_moneyflow ADD COLUMN IF NOT EXISTS sell_elg_amount FLOAT;
+                ALTER TABLE stock_moneyflow ADD COLUMN IF NOT EXISTS net_mf_vol BIGINT;
+                ALTER TABLE stock_moneyflow ADD COLUMN IF NOT EXISTS net_mf_amount FLOAT;
+
                 CREATE INDEX IF NOT EXISTS idx_stock_moneyflow_date ON stock_moneyflow (trade_date);
                 COMMENT ON TABLE stock_moneyflow IS '股票个股资金流向表';
                 COMMENT ON COLUMN stock_moneyflow.ts_code IS 'TS股票代码';
