@@ -37,13 +37,16 @@ def sync_stock_list_task(market: str = "", list_status: str = "L"):
         if success:
             result_msg = f"成功同步股票列表并入库，共 {count} 只股票。"
         else:
-            result_msg = f"成功同步股票列表，但入库失败。共 {count} 只股票。"
+            result_msg = f"同步股票列表入库失败。"
+            save_result(celery_task_id=sync_stock_list_task.request.id, result=result_msg)
+            raise RuntimeError(result_msg)
             
         save_result(celery_task_id=sync_stock_list_task.request.id, result=result_msg)
-        return {"status": "success" if success else "partial_success", "count": count}
+        return {"status": "success", "count": count}
     
-    save_result(celery_task_id=sync_stock_list_task.request.id, result="同步股票列表失败。")
-    return {"status": "failed"}
+    result_msg = "同步股票列表失败: API 返回为空。"
+    save_result(celery_task_id=sync_stock_list_task.request.id, result=result_msg)
+    raise RuntimeError(result_msg)
 
 
 @celery.task(
@@ -67,13 +70,16 @@ def sync_ths_index_task(exchange: str = "A", index_type: str = ""):
         if success:
             result_msg = f"成功同步同花顺板块指数并入库，共 {count} 条记录。"
         else:
-            result_msg = f"成功同步同花顺板块指数，但入库失败。共 {count} 条记录。"
+            result_msg = f"同步同花顺板块指数入库失败。"
+            save_result(celery_task_id=sync_ths_index_task.request.id, result=result_msg)
+            raise RuntimeError(result_msg)
             
         save_result(celery_task_id=sync_ths_index_task.request.id, result=result_msg)
-        return {"status": "success" if success else "partial_success", "count": count}
+        return {"status": "success", "count": count}
     
-    save_result(celery_task_id=sync_ths_index_task.request.id, result="同步同花顺板块指数失败。")
-    return {"status": "failed"}
+    result_msg = "同步同花顺板块指数失败: API 返回为空。"
+    save_result(celery_task_id=sync_ths_index_task.request.id, result=result_msg)
+    raise RuntimeError(result_msg)
 
 
 @celery.task(
@@ -104,14 +110,16 @@ def sync_ths_member_task(ts_code: str):
         
         if success:
             result_msg = f"成功同步板块 {ts_code} 成分并入库，共 {count} 条记录。"
+            save_result(celery_task_id=sync_ths_member_task.request.id, result=result_msg)
+            return {"status": "success", "ts_code": ts_code, "count": count}
         else:
-            result_msg = f"成功同步板块 {ts_code} 成分，但入库失败。"
-            
-        save_result(celery_task_id=sync_ths_member_task.request.id, result=result_msg)
-        return {"status": "success" if success else "failed", "ts_code": ts_code, "count": count}
+            result_msg = f"同步板块 {ts_code} 成分入库失败。"
+            save_result(celery_task_id=sync_ths_member_task.request.id, result=result_msg)
+            raise RuntimeError(result_msg)
     
-    save_result(celery_task_id=sync_ths_member_task.request.id, result=f"同步板块 {ts_code} 成分失败。")
-    return {"status": "failed"}
+    result_msg = f"同步板块 {ts_code} 成分失败: API 返回为空。"
+    save_result(celery_task_id=sync_ths_member_task.request.id, result=result_msg)
+    raise RuntimeError(result_msg)
 
 
 @celery.task(name="tasks.sync_daily_automatic")
@@ -158,10 +166,12 @@ def sync_stock_data_by_day(trade_date: str):
         with engine.connect() as conn:
             conn.execute(text(f"DELETE FROM stock_daily WHERE trade_date = '{trade_date}'"))
             conn.commit()
-        daily_success = fetcher.save_to_db(daily_df, "stock_daily", if_exists="append")
+        success = fetcher.save_to_db(daily_df, "stock_daily", if_exists="append")
+        if not success:
+            raise RuntimeError(f"日期 {trade_date}: 日线行情入库失败")
     else:
         # 如果是交易日但没拿数据，抛出异常让 Celery 重试
-        raise Exception(f"未能获取到 {trade_date} 的日线行情数据，可能接口限流或数据未更新")
+        raise RuntimeError(f"未能获取到 {trade_date} 的日线行情数据，可能接口限流或数据未更新")
     
     # 2. 获取复权因子
     adj_df = fetcher.get_adj_factor(trade_date=trade_date)
@@ -170,10 +180,12 @@ def sync_stock_data_by_day(trade_date: str):
         with engine.connect() as conn:
             conn.execute(text(f"DELETE FROM stock_adj_factor WHERE trade_date = '{trade_date}'"))
             conn.commit()
-        adj_success = fetcher.save_to_db(adj_df, "stock_adj_factor", if_exists="append")
+        success = fetcher.save_to_db(adj_df, "stock_adj_factor", if_exists="append")
+        if not success:
+            raise RuntimeError(f"日期 {trade_date}: 复权因子入库失败")
     else:
         # 复权因子缺失也抛出异常
-        raise Exception(f"未能获取到 {trade_date} 的复权因子数据")
+        raise RuntimeError(f"未能获取到 {trade_date} 的复权因子数据")
     
     result_msg = f"日期 {trade_date}: 行情入库成功, 复权因子入库成功"
     return {"date": trade_date, "msg": result_msg}
@@ -206,11 +218,10 @@ def sync_moneyflow_by_day_task(trade_date: str):
             result_msg = f"日期 {trade_date}: 资金流向入库成功，共 {len(df)} 条记录"
             return {"date": trade_date, "status": "success", "msg": result_msg}
         else:
-            raise Exception(f"日期 {trade_date}: 资金流向入库失败")
+            raise RuntimeError(f"日期 {trade_date}: 资金流向入库失败")
     else:
-        # 可能是交易日但没数据，或者非交易日
-        print(f"日期 {trade_date}: 未能获取到资金流向数据")
-        return {"date": trade_date, "status": "no_data", "msg": "未能获取到数据"}
+        # 如果是交易日但没拿数据，抛出异常让 Celery 重试
+        raise RuntimeError(f"未能获取到 {trade_date} 的资金流向数据，可能接口限流或数据未更新")
 
 
 @celery.task(name="tasks.sync_moneyflow_history")
@@ -225,8 +236,9 @@ def sync_moneyflow_history_task(start_date: str = "20180101", end_date: str = No
         
     cal_df = fetcher.get_trade_cal(start_date=start_date, end_date=end_date)
     if cal_df is None or cal_df.empty:
-        save_result(celery_task_id=sync_moneyflow_history_task.request.id, result="获取交易日历失败。")
-        return {"status": "failed", "reason": "no trade calendar"}
+        error_msg = f"资金流向历史同步失败: 获取交易日历失败 ({start_date} -> {end_date})。"
+        save_result(celery_task_id=sync_moneyflow_history_task.request.id, result=error_msg)
+        raise RuntimeError(error_msg)
     
     trade_days = cal_df['cal_date'].tolist()
     total_days = len(trade_days)
@@ -267,8 +279,9 @@ def sync_history_data_task(start_date: str = "20180101", end_date: str = None):
     # 1. 获取交易日历
     cal_df = fetcher.get_trade_cal(start_date=start_date, end_date=end_date)
     if cal_df is None or cal_df.empty:
-        save_result(celery_task_id=sync_history_data_task.request.id, result="获取交易日历失败。")
-        return {"status": "failed", "reason": "no trade calendar"}
+        error_msg = f"历史行情同步失败: 获取交易日历失败 ({start_date} -> {end_date})。"
+        save_result(celery_task_id=sync_history_data_task.request.id, result=error_msg)
+        raise RuntimeError(error_msg)
     
     trade_days = cal_df['cal_date'].tolist()
     total_days = len(trade_days)
