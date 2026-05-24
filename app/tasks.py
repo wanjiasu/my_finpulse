@@ -309,3 +309,68 @@ def sync_history_data_task(start_date: str = "20180101", end_date: str = None):
     final_msg = f"历史同步完成! 共处理 {total_days} 个交易日，成功 {success_count} 天。"
     save_result(celery_task_id=sync_history_data_task.request.id, result=final_msg)
     return {"status": "completed", "total": total_days, "success": success_count}
+
+
+@celery.task(
+    name="tasks.check_and_fix_daily_data",
+    autoretry_for=(Exception,),
+    retry_kwargs={'max_retries': 3},
+    retry_backoff=60
+)
+def check_and_fix_daily_data_task(start_date: str = "20180101", end_date: str = None):
+    """
+    检查数据质量：对比本地 stock_daily 表与 Tushare 交易日历，修补缺失日期的数据
+    """
+    fetcher = StockFetcher()
+    from .db import engine
+    import pandas as pd
+    from sqlalchemy import text
+
+    if end_date is None:
+        end_date = datetime.now().strftime("%Y%m%d")
+
+    # 1. 获取 Tushare 交易日历中的所有交易日
+    cal_df = fetcher.get_trade_cal(start_date=start_date, end_date=end_date, is_open=1)
+    if cal_df is None or cal_df.empty:
+        error_msg = f"数据检查失败: 无法获取交易日历 ({start_date} -> {end_date})"
+        save_result(celery_task_id=check_and_fix_daily_data_task.request.id, result=error_msg)
+        raise RuntimeError(error_msg)
+    
+    tushare_days = set(cal_df['cal_date'].tolist())
+
+    # 2. 获取本地数据库中已有的交易日
+    with engine.connect() as conn:
+        # 检查行情数据表
+        query_daily = text("SELECT DISTINCT trade_date FROM stock_daily WHERE trade_date >= :start AND trade_date <= :end")
+        local_daily_df = pd.read_sql(query_daily, conn, params={"start": start_date, "end": end_date})
+        local_daily_days = set(local_daily_df['trade_date'].tolist())
+
+        # 检查复权因子表
+        query_adj = text("SELECT DISTINCT trade_date FROM stock_adj_factor WHERE trade_date >= :start AND trade_date <= :end")
+        local_adj_df = pd.read_sql(query_adj, conn, params={"start": start_date, "end": end_date})
+        local_adj_days = set(local_adj_df['trade_date'].tolist())
+
+    # 3. 计算缺失的日期 (行情缺失 或 复权因子缺失 的并集)
+    missing_daily = tushare_days - local_daily_days
+    missing_adj = tushare_days - local_adj_days
+    missing_days = sorted(list(missing_daily | missing_adj))
+    total_missing = len(missing_days)
+
+    if total_missing == 0:
+        result_msg = f"数据质量检查完成: {start_date} -> {end_date} 期间行情与复权因子数据完整。"
+        save_result(celery_task_id=check_and_fix_daily_data_task.request.id, result=result_msg)
+        return {"status": "success", "missing_count": 0, "msg": result_msg}
+
+    # 4. 触发缺失日期的同步任务
+    result_msg = f"发现 {total_missing} 个缺失交易日，已启动异步修补任务。"
+    save_result(celery_task_id=check_and_fix_daily_data_task.request.id, result=result_msg)
+
+    for day in missing_days:
+        sync_stock_data_by_day.delay(trade_date=day)
+
+    return {
+        "status": "fixing",
+        "missing_count": total_missing,
+        "missing_days": missing_days,
+        "msg": result_msg
+    }
