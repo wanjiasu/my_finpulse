@@ -312,6 +312,46 @@ def sync_history_data_task(start_date: str = "20180101", end_date: str = None):
 
 
 @celery.task(
+    name="tasks.sync_index_daily",
+    autoretry_for=(Exception,),
+    retry_kwargs={'max_retries': 3},
+    retry_backoff=60
+)
+def sync_index_daily_task(ts_code: str = "000001.SH", start_date: str = "", end_date: str = "", limit: int = None):
+    """
+    异步同步指数日线行情任务
+    """
+    fetcher = IndexFetcher()
+    from .db import engine
+    from sqlalchemy import text
+    
+    # 获取指数行情数据
+    df = fetcher.get_index_daily(ts_codes=[ts_code], start_date=start_date, end_date=end_date, limit=limit)
+    
+    if df is not None and not df.empty:
+        count = len(df)
+        # 按照 ts_code 和 trade_date 进行去重保存
+        # 这里为了简单起见，先删除后插入，或者利用 PRIMARY KEY 约束
+        with engine.connect() as conn:
+            # 简单起见，这里直接调用 save_to_db，如果存在主键冲突会报错并触发重试
+            # 如果要更优雅，可以分批处理或使用 UPSERT
+            success = fetcher.save_to_db(df, "index_daily", if_exists="append")
+            
+        if success:
+            result_msg = f"成功同步指数日线行情并入库，共 {count} 条记录。"
+            save_result(celery_task_id=sync_index_daily_task.request.id, result=result_msg)
+            return {"status": "success", "count": count}
+        else:
+            result_msg = "同步指数日线行情入库失败。"
+            save_result(celery_task_id=sync_index_daily_task.request.id, result=result_msg)
+            raise RuntimeError(result_msg)
+    
+    result_msg = "同步指数日线行情失败: API 返回为空。"
+    save_result(celery_task_id=sync_index_daily_task.request.id, result=result_msg)
+    raise RuntimeError(result_msg)
+
+
+@celery.task(
     name="tasks.check_and_fix_daily_data",
     autoretry_for=(Exception,),
     retry_kwargs={'max_retries': 3},

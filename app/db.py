@@ -207,6 +207,39 @@ def init_db():
                 COMMENT ON COLUMN stock_moneyflow.net_mf_amount IS '净流入额 (万元)';
                 """
             )
+            # 指数日线行情表
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS index_daily (
+                    ts_code TEXT NOT NULL,
+                    trade_date TEXT NOT NULL,
+                    PRIMARY KEY (ts_code, trade_date)
+                );
+                ALTER TABLE index_daily ADD COLUMN IF NOT EXISTS close FLOAT;
+                ALTER TABLE index_daily ADD COLUMN IF NOT EXISTS open FLOAT;
+                ALTER TABLE index_daily ADD COLUMN IF NOT EXISTS high FLOAT;
+                ALTER TABLE index_daily ADD COLUMN IF NOT EXISTS low FLOAT;
+                ALTER TABLE index_daily ADD COLUMN IF NOT EXISTS pre_close FLOAT;
+                ALTER TABLE index_daily ADD COLUMN IF NOT EXISTS change FLOAT;
+                ALTER TABLE index_daily ADD COLUMN IF NOT EXISTS pct_chg FLOAT;
+                ALTER TABLE index_daily ADD COLUMN IF NOT EXISTS vol FLOAT;
+                ALTER TABLE index_daily ADD COLUMN IF NOT EXISTS amount FLOAT;
+
+                CREATE INDEX IF NOT EXISTS idx_index_daily_date ON index_daily (trade_date);
+                COMMENT ON TABLE index_daily IS '指数日线行情表';
+                COMMENT ON COLUMN index_daily.ts_code IS 'TS指数代码';
+                COMMENT ON COLUMN index_daily.trade_date IS '交易日期';
+                COMMENT ON COLUMN index_daily.close IS '收盘点位';
+                COMMENT ON COLUMN index_daily.open IS '开盘点位';
+                COMMENT ON COLUMN index_daily.high IS '最高点位';
+                COMMENT ON COLUMN index_daily.low IS '最低点位';
+                COMMENT ON COLUMN index_daily.pre_close IS '昨日收盘点';
+                COMMENT ON COLUMN index_daily.change IS '涨跌点';
+                COMMENT ON COLUMN index_daily.pct_chg IS '涨跌幅';
+                COMMENT ON COLUMN index_daily.vol IS '成交量 (手)';
+                COMMENT ON COLUMN index_daily.amount IS '成交额 (千元)';
+                """
+            )
             conn.commit()
 
 

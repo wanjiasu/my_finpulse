@@ -14,7 +14,8 @@ from .tasks import (
     sync_moneyflow_by_day_task,
     sync_moneyflow_history_task,
     check_and_fix_daily_data_task,
-    check_and_fix_moneyflow_data_task
+    check_and_fix_moneyflow_data_task,
+    sync_index_daily_task
 )
 
 app = FastAPI(title=settings.APP_NAME)
@@ -93,6 +94,20 @@ def sync_stocks(
     """
     task = sync_stock_list_task.delay(market=market, list_status=list_status)
     return {"celery_task_id": task.id, "state": task.state, "detail": "同步任务已在后台启动"}
+
+
+@app.post("/indexes/sync_daily")
+def sync_index_daily(
+    ts_code: str = Query("000001.SH", description="指数代码，例如 '000001.SH'"),
+    start_date: str = Query("", description="开始日期 (YYYYMMDD)"),
+    end_date: str = Query("", description="结束日期 (YYYYMMDD)"),
+    limit: int = Query(None, description="获取的数据条数上限")
+):
+    """
+    异步同步指数日线行情
+    """
+    task = sync_index_daily_task.delay(ts_code=ts_code, start_date=start_date, end_date=end_date, limit=limit)
+    return {"celery_task_id": task.id, "state": task.state, "detail": f"指数 {ts_code} 同步任务已启动"}
 
 
 @app.post("/stocks/sync_history")
