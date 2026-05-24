@@ -13,7 +13,8 @@ from .tasks import (
     sync_ths_member_task,
     sync_moneyflow_by_day_task,
     sync_moneyflow_history_task,
-    check_and_fix_daily_data_task
+    check_and_fix_daily_data_task,
+    check_and_fix_moneyflow_data_task
 )
 
 app = FastAPI(title=settings.APP_NAME)
@@ -142,6 +143,18 @@ def sync_moneyflow(
         trade_date = datetime.now().strftime("%Y%m%d")
     task = sync_moneyflow_by_day_task.delay(trade_date=trade_date)
     return {"celery_task_id": task.id, "state": task.state, "detail": f"{trade_date} 资金流向同步任务已启动"}
+
+
+@app.post("/stocks/moneyflow/check_data")
+def check_moneyflow_data(
+    start_date: str = Query("20180101", description="开始日期 (YYYYMMDD)"), 
+    end_date: str = Query(None, description="结束日期 (YYYYMMDD), 默认为今天")
+):
+    """
+    检查本地 stock_moneyflow 数据完整性，并自动修补缺失的交易日数据
+    """
+    task = check_and_fix_moneyflow_data_task.delay(start_date=start_date, end_date=end_date)
+    return {"celery_task_id": task.id, "state": task.state, "detail": "资金流数据完整性检查任务已启动"}
 
 
 @app.post("/stocks/moneyflow/sync_history")
