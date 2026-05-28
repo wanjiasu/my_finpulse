@@ -22,4 +22,14 @@ celery.conf.beat_schedule = {
         "task": "tasks.sync_daily_automatic",
         "schedule": crontab(hour=18, minute=0),
     },
+    "sync_calendar_sse_at_8am": {
+        "task": "tasks.sync_trade_calendar",
+        "schedule": crontab(hour=8, minute=0),
+        "kwargs": {"exchange": "SSE"},
+    },
+    "sync_calendar_szse_at_8am": {
+        "task": "tasks.sync_trade_calendar",
+        "schedule": crontab(hour=8, minute=5),
+        "kwargs": {"exchange": "SZSE"},
+    },
 }
