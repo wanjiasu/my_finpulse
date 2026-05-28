@@ -15,7 +15,8 @@ from .tasks import (
     sync_moneyflow_history_task,
     check_and_fix_daily_data_task,
     check_and_fix_moneyflow_data_task,
-    sync_index_daily_task
+    sync_index_daily_task,
+    sync_trade_calendar_task
 )
 
 app = FastAPI(title=settings.APP_NAME)
@@ -94,6 +95,17 @@ def sync_stocks(
     """
     task = sync_stock_list_task.delay(market=market, list_status=list_status)
     return {"celery_task_id": task.id, "state": task.state, "detail": "同步任务已在后台启动"}
+
+
+@app.post("/stocks/sync_calendar")
+def sync_calendar(
+    exchange: str = Query("SSE", description="交易所代码: SSE上交所, SZSE深交所, CFFEX中金所, SHFE上期所, CZCE郑商所, DCE大商所, INE上能源")
+):
+    """
+    异步同步交易日历 (增量同步)
+    """
+    task = sync_trade_calendar_task.delay(exchange=exchange)
+    return {"celery_task_id": task.id, "state": task.state, "detail": f"交易所 {exchange} 交易日历同步任务已启动"}
 
 
 @app.post("/indexes/sync_daily")

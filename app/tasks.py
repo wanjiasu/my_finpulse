@@ -234,7 +234,7 @@ def sync_moneyflow_history_task(start_date: str = "20180101", end_date: str = No
     if end_date is None:
         end_date = (datetime.now() - timedelta(days=1)).strftime("%Y%m%d")
         
-    cal_df = fetcher.get_trade_cal(start_date=start_date, end_date=end_date)
+    cal_df = fetcher.get_trade_cal(start_date=start_date, end_date=end_date, is_open=1)
     if cal_df is None or cal_df.empty:
         error_msg = f"资金流向历史同步失败: 获取交易日历失败 ({start_date} -> {end_date})。"
         save_result(celery_task_id=sync_moneyflow_history_task.request.id, result=error_msg)
@@ -277,7 +277,7 @@ def sync_history_data_task(start_date: str = "20180101", end_date: str = None):
         end_date = (datetime.now() - timedelta(days=1)).strftime("%Y%m%d")
         
     # 1. 获取交易日历
-    cal_df = fetcher.get_trade_cal(start_date=start_date, end_date=end_date)
+    cal_df = fetcher.get_trade_cal(start_date=start_date, end_date=end_date, is_open=1)
     if cal_df is None or cal_df.empty:
         error_msg = f"历史行情同步失败: 获取交易日历失败 ({start_date} -> {end_date})。"
         save_result(celery_task_id=sync_history_data_task.request.id, result=error_msg)
@@ -349,6 +349,66 @@ def sync_index_daily_task(ts_code: str = "000001.SH", start_date: str = "", end_
     result_msg = "同步指数日线行情失败: API 返回为空。"
     save_result(celery_task_id=sync_index_daily_task.request.id, result=result_msg)
     raise RuntimeError(result_msg)
+
+
+@celery.task(
+    name="tasks.sync_trade_calendar",
+    autoretry_for=(Exception,),
+    retry_kwargs={'max_retries': 3},
+    retry_backoff=60
+)
+def sync_trade_calendar_task(exchange: str = "SSE"):
+    """
+    异步增量同步交易日历任务
+    """
+    fetcher = StockFetcher()
+    from .db import engine
+    from sqlalchemy import text
+    import pandas as pd
+
+    # 1. 获取本地数据库中已有的最大日期
+    start_date = "20180101"
+    try:
+        with engine.connect() as conn:
+            query = text("SELECT MAX(cal_date) FROM trade_calendar WHERE exchange = :exchange")
+            res = conn.execute(query, {"exchange": exchange}).scalar()
+            if res:
+                # 如果已有数据，则从最大日期的下一天开始同步
+                start_dt = datetime.strptime(res, "%Y%m%d") + timedelta(days=1)
+                start_date = start_dt.strftime("%Y%m%d")
+    except Exception as e:
+        print(f"查询本地交易日历最大日期失败: {e}")
+
+    today = datetime.now().strftime("%Y%m%d")
+    
+    # 如果起始日期大于今天，说明已经是最新的了
+    if start_date > today:
+        result_msg = f"交易所 {exchange} 的交易日历已是最新 (截至 {today})。"
+        save_result(celery_task_id=sync_trade_calendar_task.request.id, result=result_msg)
+        return {"status": "success", "msg": result_msg}
+
+    print(f"开始同步 {exchange} 交易日历: {start_date} -> {today}")
+
+    # 2. 从 Tushare 获取交易日历 (不限 is_open，获取全部日历)
+    df = fetcher.get_trade_cal(exchange=exchange, start_date=start_date, end_date=today, is_open=None)
+    
+    if df is not None and not df.empty:
+        count = len(df)
+        success = fetcher.save_to_db(df, "trade_calendar", if_exists="append")
+        
+        if success:
+            result_msg = f"成功同步交易所 {exchange} 交易日历并入库，共 {count} 条记录 ({start_date} -> {today})。"
+            save_result(celery_task_id=sync_trade_calendar_task.request.id, result=result_msg)
+            return {"status": "success", "count": count}
+        else:
+            result_msg = f"同步交易所 {exchange} 交易日历入库失败。"
+            save_result(celery_task_id=sync_trade_calendar_task.request.id, result=result_msg)
+            raise RuntimeError(result_msg)
+    
+    result_msg = f"同步交易所 {exchange} 交易日历失败: API 返回为空。"
+    save_result(celery_task_id=sync_trade_calendar_task.request.id, result=result_msg)
+    # 如果没有新数据返回，可能确实没有新日期，不一定抛错
+    return {"status": "no_data", "msg": result_msg}
 
 
 @celery.task(

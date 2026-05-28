@@ -31,17 +31,22 @@ class StockFetcher(TushareFetcher):
             print(f"获取股票列表时发生错误: {e}")
             return None
 
-    def get_trade_cal(self, start_date: str = "", end_date: str = "", exchange: str = "SSE", is_open: int = 1):
+    def get_trade_cal(self, start_date: str = "", end_date: str = "", exchange: str = "SSE", is_open: int = None):
         """
         获取交易日历。
         """
+        params = {
+            'exchange': exchange,
+            'start_date': start_date,
+            'end_date': end_date
+        }
+        if is_open is not None:
+            params['is_open'] = is_open
+
         try:
             df = self.call_with_retry(
                 self.pro.trade_cal,
-                exchange=exchange,
-                start_date=start_date,
-                end_date=end_date,
-                is_open=is_open
+                **params
             )
             return self._handle_data(df, "get_trade_cal")
         except Exception as e:

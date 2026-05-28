@@ -240,6 +240,25 @@ def init_db():
                 COMMENT ON COLUMN index_daily.amount IS '成交额 (千元)';
                 """
             )
+            # 交易日历表
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS trade_calendar (
+                    exchange TEXT NOT NULL,
+                    cal_date TEXT NOT NULL,
+                    PRIMARY KEY (exchange, cal_date)
+                );
+                ALTER TABLE trade_calendar ADD COLUMN IF NOT EXISTS is_open INTEGER;
+                ALTER TABLE trade_calendar ADD COLUMN IF NOT EXISTS pretrade_date TEXT;
+
+                CREATE INDEX IF NOT EXISTS idx_trade_cal_date ON trade_calendar (cal_date);
+                COMMENT ON TABLE trade_calendar IS '交易日历表';
+                COMMENT ON COLUMN trade_calendar.exchange IS '交易所 SSE上交所 SZSE深交所';
+                COMMENT ON COLUMN trade_calendar.cal_date IS '日历日期';
+                COMMENT ON COLUMN trade_calendar.is_open IS '是否交易 0休市 1交易';
+                COMMENT ON COLUMN trade_calendar.pretrade_date IS '上一个交易日';
+                """
+            )
             conn.commit()
 
 
