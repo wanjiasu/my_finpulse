@@ -266,6 +266,29 @@ def init_db():
                 COMMENT ON COLUMN trade_calendar.pretrade_date IS '上一个交易日';
                 """
             )
+            # 沪深港通资金流向表
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS stock_moneyflow_hsgt (
+                    trade_date TEXT PRIMARY KEY,
+                    ggt_ss FLOAT,
+                    ggt_sz FLOAT,
+                    hgt FLOAT,
+                    sgt FLOAT,
+                    north_money FLOAT,
+                    south_money FLOAT
+                );
+                CREATE INDEX IF NOT EXISTS idx_moneyflow_hsgt_date ON stock_moneyflow_hsgt (trade_date);
+                COMMENT ON TABLE stock_moneyflow_hsgt IS '沪深港通资金流向表';
+                COMMENT ON COLUMN stock_moneyflow_hsgt.trade_date IS '交易日期';
+                COMMENT ON COLUMN stock_moneyflow_hsgt.ggt_ss IS '港股通（上海）';
+                COMMENT ON COLUMN stock_moneyflow_hsgt.ggt_sz IS '港股通（深圳）';
+                COMMENT ON COLUMN stock_moneyflow_hsgt.hgt IS '沪股通 (百万元)';
+                COMMENT ON COLUMN stock_moneyflow_hsgt.sgt IS '深股通 (百万元)';
+                COMMENT ON COLUMN stock_moneyflow_hsgt.north_money IS '北向资金 (百万元)';
+                COMMENT ON COLUMN stock_moneyflow_hsgt.south_money IS '南向资金 (百万元)';
+                """
+            )
             # 利润表
             cur.execute(
                 """

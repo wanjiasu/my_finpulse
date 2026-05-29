@@ -13,6 +13,7 @@ from .tasks import (
     sync_ths_member_task,
     sync_moneyflow_by_day_task,
     sync_moneyflow_history_task,
+    sync_moneyflow_hsgt_task,
     check_and_fix_daily_data_task,
     check_and_fix_moneyflow_data_task,
     sync_index_daily_task,
@@ -182,6 +183,21 @@ def sync_moneyflow(
         trade_date = datetime.now().strftime("%Y%m%d")
     task = sync_moneyflow_by_day_task.delay(trade_date=trade_date)
     return {"celery_task_id": task.id, "state": task.state, "detail": f"{trade_date} 资金流向同步任务已启动"}
+
+
+@app.post("/stocks/moneyflow/hsgt/sync")
+def sync_moneyflow_hsgt(
+    trade_date: str = Query(None, description="交易日期 (YYYYMMDD)"),
+    start_date: str = Query(None, description="开始日期 (YYYYMMDD)"),
+    end_date: str = Query(None, description="结束日期 (YYYYMMDD)")
+):
+    """
+    异步同步沪深港通资金流向数据
+    """
+    if not trade_date and not start_date:
+        trade_date = datetime.now().strftime("%Y%m%d")
+    task = sync_moneyflow_hsgt_task.delay(trade_date=trade_date, start_date=start_date, end_date=end_date)
+    return {"celery_task_id": task.id, "state": task.state, "detail": "沪深港通资金流向同步任务已启动"}
 
 
 @app.post("/stocks/moneyflow/check_data")

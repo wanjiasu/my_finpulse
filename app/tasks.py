@@ -224,6 +224,42 @@ def sync_moneyflow_by_day_task(trade_date: str):
         raise RuntimeError(f"未能获取到 {trade_date} 的资金流向数据，可能接口限流或数据未更新")
 
 
+@celery.task(
+    name="tasks.sync_moneyflow_hsgt",
+    autoretry_for=(Exception,),
+    retry_kwargs={'max_retries': 3},
+    retry_backoff=60
+)
+def sync_moneyflow_hsgt_task(trade_date: str = "", start_date: str = "", end_date: str = ""):
+    """
+    同步沪深港通资金流向任务
+    """
+    fetcher = MoneyflowFetcher()
+    from .db import engine
+    from sqlalchemy import text
+    
+    df = fetcher.get_moneyflow_hsgt(trade_date=trade_date, start_date=start_date, end_date=end_date)
+    
+    if df is not None and not df.empty:
+        count = len(df)
+        with engine.begin() as conn:
+            # 批量 Upsert：先删除
+            dates = df['trade_date'].unique().tolist()
+            conn.execute(text("DELETE FROM stock_moneyflow_hsgt WHERE trade_date = ANY(:ds)"), {"ds": dates})
+            # 插入
+            df.to_sql("stock_moneyflow_hsgt", conn, if_exists="append", index=False)
+            
+        result_msg = f"成功同步沪深港通资金流向并入库，共 {count} 条记录。"
+        save_result(celery_task_id=sync_moneyflow_hsgt_task.request.id, result=result_msg)
+        return {"status": "success", "count": count}
+    
+    # 如果没获取到数据且是单日任务，抛出异常重试
+    if trade_date or (start_date and start_date == end_date):
+        raise RuntimeError(f"未能获取到沪深港通资金流向数据: {trade_date or start_date}")
+    
+    return {"status": "no_data", "msg": "API 返回为空"}
+
+
 @celery.task(name="tasks.sync_moneyflow_history")
 def sync_moneyflow_history_task(start_date: str = "20180101", end_date: str = None):
     """

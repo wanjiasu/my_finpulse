@@ -28,3 +28,22 @@ class MoneyflowFetcher(TushareFetcher):
         except Exception as e:
             print(f"获取资金流向时发生错误: {e}")
             return None
+
+    def get_moneyflow_hsgt(self, trade_date: str = "", start_date: str = "", end_date: str = ""):
+        """
+        获取沪深港通资金流向数据 (moneyflow_hsgt)。
+        """
+        params = {}
+        if trade_date: params['trade_date'] = trade_date
+        if start_date: params['start_date'] = start_date
+        if end_date: params['end_date'] = end_date
+
+        try:
+            df = self.call_with_retry(
+                self.pro.moneyflow_hsgt,
+                **params
+            )
+            return self._handle_data(df, f"get_moneyflow_hsgt({trade_date if trade_date else start_date + '-' + end_date})")
+        except Exception as e:
+            print(f"获取沪深港通资金流向时发生错误: {e}")
+            return None
