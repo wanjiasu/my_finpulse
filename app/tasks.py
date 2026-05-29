@@ -2,7 +2,7 @@ import time
 from datetime import datetime, timedelta
 from .celery_app import celery
 from .db import save_result, init_db
-from .data_fetcher import StockFetcher, IndexFetcher, SectorFetcher, MoneyflowFetcher
+from .data_fetcher import StockFetcher, IndexFetcher, SectorFetcher, MoneyflowFetcher, FinancialFetcher
 
 # 确保数据库表已创建
 init_db()
@@ -264,6 +264,92 @@ def sync_moneyflow_history_task(start_date: str = "20180101", end_date: str = No
     final_msg = f"资金流向历史同步完成! 共处理 {total_days} 个交易日，成功 {success_count} 天。"
     save_result(celery_task_id=sync_moneyflow_history_task.request.id, result=final_msg)
     return {"status": "completed", "total": total_days, "success": success_count}
+
+
+@celery.task(
+    name="tasks.sync_financial_data",
+    autoretry_for=(Exception,),
+    retry_kwargs={'max_retries': 3},
+    retry_backoff=60
+)
+def sync_financial_data_task(ts_code: str):
+    """
+    同步单个股票的财务报表数据（利润表、资产负债表、现金流量表）
+    """
+    fetcher = FinancialFetcher()
+    from .db import engine
+    from sqlalchemy import text
+    
+    # 定义每张表需要的字段，防止 DataFrame 中多余字段导致入库失败
+    income_cols = [
+        'ts_code', 'ann_date', 'f_ann_date', 'end_date', 'report_type', 'comp_type',
+        'basic_eps', 'diluted_eps', 'total_revenue', 'revenue', 'oper_cost',
+        'total_cogs', 'operate_profit', 'total_profit', 'income_tax', 'n_income',
+        'n_income_attr_p', 'ebit', 'ebitda'
+    ]
+    
+    bs_cols = [
+        'ts_code', 'ann_date', 'f_ann_date', 'end_date', 'report_type', 'comp_type',
+        'total_share', 'cap_rese', 'undistr_profit', 'surplus_rese', 'money_cap',
+        'trad_asset', 'notes_receiv', 'accounts_receiv', 'inventories',
+        'total_cur_assets', 'total_assets', 'total_cur_liab', 'total_liab'
+    ]
+    
+    cf_cols = [
+        'ts_code', 'ann_date', 'f_ann_date', 'end_date', 'report_type', 'comp_type',
+        'net_profit', 'n_cashflow_act', 'n_cashflow_inv_act', 'n_cashflow_fnc_act',
+        'n_incr_cash_cash_equ'
+    ]
+
+    # 1. 同步利润表
+    income_df = fetcher.get_income(ts_code=ts_code)
+    if income_df is not None and not income_df.empty:
+        # 去重：基于主键去重，保留公告日期最新的记录
+        income_df = income_df.sort_values('ann_date', ascending=False).drop_duplicates(
+            subset=['ts_code', 'end_date', 'report_type'], keep='first'
+        )
+        
+        # 仅保留数据库中存在的列
+        valid_income_df = income_df[[c for c in income_cols if c in income_df.columns]]
+        with engine.begin() as conn:
+            # 全量清理该股票的利润表数据，确保增量/更新逻辑正确
+            conn.execute(text("DELETE FROM fina_income WHERE ts_code = :ts"), {"ts": ts_code})
+            # 事务内入库
+            valid_income_df.to_sql("fina_income", conn, if_exists="append", index=False)
+
+    # 2. 同步资产负债表
+    bs_df = fetcher.get_balancesheet(ts_code=ts_code)
+    if bs_df is not None and not bs_df.empty:
+        # 去重
+        bs_df = bs_df.sort_values('ann_date', ascending=False).drop_duplicates(
+            subset=['ts_code', 'end_date', 'report_type'], keep='first'
+        )
+        
+        # 修正可能存在的字段名差异
+        if 'undistr_profit' not in bs_df.columns and 'undistr_porfit' in bs_df.columns:
+            bs_df = bs_df.rename(columns={'undistr_porfit': 'undistr_profit'})
+            
+        valid_bs_df = bs_df[[c for c in bs_cols if c in bs_df.columns]]
+        with engine.begin() as conn:
+            conn.execute(text("DELETE FROM fina_balancesheet WHERE ts_code = :ts"), {"ts": ts_code})
+            valid_bs_df.to_sql("fina_balancesheet", conn, if_exists="append", index=False)
+
+    # 3. 同步现金流量表
+    cf_df = fetcher.get_cashflow(ts_code=ts_code)
+    if cf_df is not None and not cf_df.empty:
+        # 去重
+        cf_df = cf_df.sort_values('ann_date', ascending=False).drop_duplicates(
+            subset=['ts_code', 'end_date', 'report_type'], keep='first'
+        )
+        
+        valid_cf_df = cf_df[[c for c in cf_cols if c in cf_df.columns]]
+        with engine.begin() as conn:
+            conn.execute(text("DELETE FROM fina_cashflow WHERE ts_code = :ts"), {"ts": ts_code})
+            valid_cf_df.to_sql("fina_cashflow", conn, if_exists="append", index=False)
+
+    result_msg = f"股票 {ts_code} 财务报表同步完成。"
+    save_result(celery_task_id=sync_financial_data_task.request.id, result=result_msg)
+    return {"status": "success", "ts_code": ts_code}
 
 
 @celery.task(name="tasks.sync_history_data")

@@ -4,7 +4,14 @@ from sqlalchemy import create_engine, text
 from .settings import settings
 
 # 创建 SQLAlchemy 引擎
-engine = create_engine(settings.POSTGRES_DSN)
+# 增加 pool_size 和 max_overflow 以支持 Celery 并发任务，防止连接池溢出
+engine = create_engine(
+    settings.POSTGRES_DSN,
+    pool_size=20,           # 基础连接池大小
+    max_overflow=40,        # 允许额外溢出的连接数
+    pool_timeout=30,        # 等待连接的超时时间（秒）
+    pool_pre_ping=True      # 每次获取连接前检查是否可用，防止失效连接报错
+)
 
 def get_conn():
     return psycopg2.connect(settings.POSTGRES_DSN)
@@ -257,6 +264,102 @@ def init_db():
                 COMMENT ON COLUMN trade_calendar.cal_date IS '日历日期';
                 COMMENT ON COLUMN trade_calendar.is_open IS '是否交易 0休市 1交易';
                 COMMENT ON COLUMN trade_calendar.pretrade_date IS '上一个交易日';
+                """
+            )
+            # 利润表
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS fina_income (
+                    ts_code TEXT NOT NULL,
+                    ann_date TEXT,
+                    f_ann_date TEXT,
+                    end_date TEXT NOT NULL,
+                    report_type TEXT NOT NULL,
+                    comp_type TEXT,
+                    basic_eps FLOAT,
+                    diluted_eps FLOAT,
+                    total_revenue FLOAT,
+                    revenue FLOAT,
+                    oper_cost FLOAT,
+                    total_cogs FLOAT,
+                    operate_profit FLOAT,
+                    total_profit FLOAT,
+                    income_tax FLOAT,
+                    n_income FLOAT,
+                    n_income_attr_p FLOAT,
+                    ebit FLOAT,
+                    ebitda FLOAT,
+                    PRIMARY KEY (ts_code, end_date, report_type)
+                );
+                CREATE INDEX IF NOT EXISTS idx_fina_income_date ON fina_income (end_date);
+                COMMENT ON TABLE fina_income IS '上市公司利润表';
+                COMMENT ON COLUMN fina_income.ts_code IS 'TS代码';
+                COMMENT ON COLUMN fina_income.ann_date IS '公告日期';
+                COMMENT ON COLUMN fina_income.f_ann_date IS '实际公告日期';
+                COMMENT ON COLUMN fina_income.end_date IS '报告期';
+                COMMENT ON COLUMN fina_income.report_type IS '报告类型';
+                COMMENT ON COLUMN fina_income.comp_type IS '公司类型';
+                """
+            )
+            # 资产负债表
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS fina_balancesheet (
+                    ts_code TEXT NOT NULL,
+                    ann_date TEXT,
+                    f_ann_date TEXT,
+                    end_date TEXT NOT NULL,
+                    report_type TEXT NOT NULL,
+                    comp_type TEXT,
+                    total_share FLOAT,
+                    cap_rese FLOAT,
+                    undistr_profit FLOAT,
+                    surplus_rese FLOAT,
+                    money_cap FLOAT,
+                    trad_asset FLOAT,
+                    notes_receiv FLOAT,
+                    accounts_receiv FLOAT,
+                    inventories FLOAT,
+                    total_cur_assets FLOAT,
+                    total_assets FLOAT,
+                    total_cur_liab FLOAT,
+                    total_liab FLOAT,
+                    PRIMARY KEY (ts_code, end_date, report_type)
+                );
+                ALTER TABLE fina_balancesheet ADD COLUMN IF NOT EXISTS undistr_profit FLOAT;
+                CREATE INDEX IF NOT EXISTS idx_fina_balancesheet_date ON fina_balancesheet (end_date);
+                COMMENT ON TABLE fina_balancesheet IS '上市公司资产负债表';
+                COMMENT ON COLUMN fina_balancesheet.ts_code IS 'TS代码';
+                COMMENT ON COLUMN fina_balancesheet.ann_date IS '公告日期';
+                COMMENT ON COLUMN fina_balancesheet.f_ann_date IS '实际公告日期';
+                COMMENT ON COLUMN fina_balancesheet.end_date IS '报告期';
+                COMMENT ON COLUMN fina_balancesheet.report_type IS '报告类型';
+                """
+            )
+            # 现金流量表
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS fina_cashflow (
+                    ts_code TEXT NOT NULL,
+                    ann_date TEXT,
+                    f_ann_date TEXT,
+                    end_date TEXT NOT NULL,
+                    report_type TEXT NOT NULL,
+                    comp_type TEXT,
+                    net_profit FLOAT,
+                    n_cashflow_act FLOAT,
+                    n_cashflow_inv_act FLOAT,
+                    n_cashflow_fnc_act FLOAT,
+                    n_incr_cash_cash_equ FLOAT,
+                    PRIMARY KEY (ts_code, end_date, report_type)
+                );
+                CREATE INDEX IF NOT EXISTS idx_fina_cashflow_date ON fina_cashflow (end_date);
+                COMMENT ON TABLE fina_cashflow IS '上市公司现金流量表';
+                COMMENT ON COLUMN fina_cashflow.ts_code IS 'TS代码';
+                COMMENT ON COLUMN fina_cashflow.ann_date IS '公告日期';
+                COMMENT ON COLUMN fina_cashflow.f_ann_date IS '实际公告日期';
+                COMMENT ON COLUMN fina_cashflow.end_date IS '报告期';
+                COMMENT ON COLUMN fina_cashflow.report_type IS '报告类型';
                 """
             )
             conn.commit()

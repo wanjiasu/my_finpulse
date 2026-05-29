@@ -112,3 +112,7 @@ uv run celery -A app.celery_app.celery flower --port=5555
 2.  **自动重试机制**: 基类内置 API 限流重试逻辑，触发 Tushare 频率限制时自动休息 60 秒后重试。
 3.  **异步持久化**: 结合 Celery 和 SQLAlchemy，支持大规模数据（如数年历史行情）的异步批量入库。
 4.  **鲁棒性**: 任务级别支持异常自动重试，确保长周期同步任务的稳定性。
+
+
+## 当前问题
+finacial数据待进一步研究

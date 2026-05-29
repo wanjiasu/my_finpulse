@@ -16,7 +16,8 @@ from .tasks import (
     check_and_fix_daily_data_task,
     check_and_fix_moneyflow_data_task,
     sync_index_daily_task,
-    sync_trade_calendar_task
+    sync_trade_calendar_task,
+    sync_financial_data_task
 )
 
 app = FastAPI(title=settings.APP_NAME)
@@ -145,6 +146,17 @@ def sync_daily(
         trade_date = datetime.now().strftime("%Y%m%d")
     task = sync_stock_data_by_day.delay(trade_date=trade_date)
     return {"celery_task_id": task.id, "state": task.state, "detail": f"{trade_date} 同步任务已启动"}
+
+
+@app.post("/financial/sync")
+def sync_financial_data(
+    ts_code: str = Query(..., description="股票代码 (例如: 000001.SZ)")
+):
+    """
+    异步同步指定股票的财务报表数据 (利润表、资产负债表、现金流量表)
+    """
+    task = sync_financial_data_task.delay(ts_code=ts_code)
+    return {"celery_task_id": task.id, "state": task.state, "detail": f"股票 {ts_code} 财务同步任务已启动"}
 
 
 @app.post("/stocks/check_data")
