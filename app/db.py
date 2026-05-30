@@ -385,6 +385,33 @@ def init_db():
                 COMMENT ON COLUMN fina_cashflow.report_type IS '报告类型';
                 """
             )
+            # 股票 RPS 排名表
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS stock_rps_daily (
+                    ts_code TEXT NOT NULL,
+                    trade_date TEXT NOT NULL,
+                    rps_50_all FLOAT,
+                    rps_120_all FLOAT,
+                    rps_250_all FLOAT,
+                    rps_50_market FLOAT,
+                    rps_120_market FLOAT,
+                    rps_250_market FLOAT,
+                    rps_50_industry FLOAT,
+                    rps_120_industry FLOAT,
+                    rps_250_industry FLOAT,
+                    updated_at TIMESTAMPTZ DEFAULT now(),
+                    PRIMARY KEY (ts_code, trade_date)
+                );
+                CREATE INDEX IF NOT EXISTS idx_stock_rps_daily_date ON stock_rps_daily (trade_date);
+                COMMENT ON TABLE stock_rps_daily IS '股票RPS排名表';
+                COMMENT ON COLUMN stock_rps_daily.ts_code IS 'TS代码';
+                COMMENT ON COLUMN stock_rps_daily.trade_date IS '交易日期';
+                COMMENT ON COLUMN stock_rps_daily.rps_50_all IS '全市场RPS50';
+                COMMENT ON COLUMN stock_rps_daily.rps_120_all IS '全市场RPS120';
+                COMMENT ON COLUMN stock_rps_daily.rps_250_all IS '全市场RPS250';
+                """
+            )
             conn.commit()
 
 

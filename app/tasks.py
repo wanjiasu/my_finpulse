@@ -249,15 +249,26 @@ def sync_moneyflow_hsgt_task(trade_date: str = "", start_date: str = "", end_dat
             # 插入
             df.to_sql("stock_moneyflow_hsgt", conn, if_exists="append", index=False)
             
-        result_msg = f"成功同步沪深港通资金流向并入库，共 {count} 条记录。"
-        save_result(celery_task_id=sync_moneyflow_hsgt_task.request.id, result=result_msg)
         return {"status": "success", "count": count}
-    
-    # 如果没获取到数据且是单日任务，抛出异常重试
-    if trade_date or (start_date and start_date == end_date):
-        raise RuntimeError(f"未能获取到沪深港通资金流向数据: {trade_date or start_date}")
-    
-    return {"status": "no_data", "msg": "API 返回为空"}
+    return {"status": "no_data"}
+
+@celery.task(
+    name="tasks.calculate_rps",
+    autoretry_for=(Exception,),
+    retry_kwargs={'max_retries': 3},
+    retry_backoff=60
+)
+def calculate_rps_task(trade_date: str):
+    """
+    异步计算 RPS 任务
+    """
+    from .data_fetcher.calculate_rps import RPSCalculator
+    calc = RPSCalculator()
+    success = calc.run(trade_date)
+    if success:
+        return {"status": "success", "date": trade_date}
+    else:
+        raise RuntimeError(f"日期 {trade_date}: RPS 计算失败")
 
 
 @celery.task(name="tasks.sync_moneyflow_history")

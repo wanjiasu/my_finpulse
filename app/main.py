@@ -18,7 +18,8 @@ from .tasks import (
     check_and_fix_moneyflow_data_task,
     sync_index_daily_task,
     sync_trade_calendar_task,
-    sync_financial_data_task
+    sync_financial_data_task,
+    calculate_rps_task
 )
 
 app = FastAPI(title=settings.APP_NAME)
@@ -146,7 +147,20 @@ def sync_daily(
     if not trade_date:
         trade_date = datetime.now().strftime("%Y%m%d")
     task = sync_stock_data_by_day.delay(trade_date=trade_date)
-    return {"celery_task_id": task.id, "state": task.state, "detail": f"{trade_date} 同步任务已启动"}
+    return {"celery_task_id": task.id, "state": task.state, "detail": f"{trade_date} 同步行情任务已启动"}
+
+
+@app.post("/stocks/rps/calculate")
+def calculate_rps(
+    trade_date: str = Query(None, description="计算日期 (YYYYMMDD), 默认为当天")
+):
+    """
+    异步计算指定日期的 RPS 排名
+    """
+    if not trade_date:
+        trade_date = datetime.now().strftime("%Y%m%d")
+    task = calculate_rps_task.delay(trade_date=trade_date)
+    return {"celery_task_id": task.id, "state": task.state, "detail": f"{trade_date} RPS 计算任务已启动"}
 
 
 @app.post("/financial/sync")
