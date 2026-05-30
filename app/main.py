@@ -22,7 +22,23 @@ from .tasks import (
     calculate_rps_task
 )
 
-app = FastAPI(title=settings.APP_NAME)
+app = FastAPI(
+    title=settings.APP_NAME,
+    description="FinPulse 股票数据采集与分析系统 API 文档",
+    version="1.0.0",
+    openapi_tags=[
+        {"name": "系统接口", "description": "健康检查与基础系统功能"},
+        {"name": "任务管理", "description": "Celery 异步任务状态查询与管理"},
+        {"name": "股票数据", "description": "股票列表、日线行情及同步任务"},
+        {"name": "指数数据", "description": "指数日线行情同步"},
+        {"name": "板块数据", "description": "同花顺板块指数及成分股同步"},
+        {"name": "资金流向", "description": "个股资金流向及沪深港通资金流"},
+        {"name": "财务数据", "description": "上市公司财务报表同步"},
+        {"name": "数据分析", "description": "RPS 排名计算等分析任务"},
+        {"name": "数据维护", "description": "数据完整性检查与自动修复"},
+        {"name": "基础数据", "description": "交易日历等基础信息同步"},
+    ]
+)
 
 
 @app.get("/docs/scalar", include_in_schema=False)
@@ -38,18 +54,18 @@ def _startup():
     init_db()
 
 
-@app.get("/health")
+@app.get("/health", tags=["系统接口"])
 def health():
     return {"status": "ok"}
 
 
-@app.post("/tasks/add")
+@app.post("/tasks/add", tags=["任务管理"])
 def create_add_task(x: int, y: int):
     task = add.delay(x, y)
     return {"celery_task_id": task.id, "state": task.state}
 
 
-@app.get("/tasks/{task_id}")
+@app.get("/tasks/{task_id}", tags=["任务管理"])
 def get_task_result(task_id: str):
     row = fetch_result(task_id)
     if not row:
@@ -57,7 +73,7 @@ def get_task_result(task_id: str):
     return row
 
 
-@app.get("/stocks/list")
+@app.get("/stocks/list", tags=["股票数据"])
 def get_stocks(
     ts_code: str = "",
     name: str = "",
@@ -88,7 +104,7 @@ def get_stocks(
     return df.to_dict(orient="records")
 
 
-@app.post("/stocks/sync")
+@app.post("/stocks/sync", tags=["股票数据"])
 def sync_stocks(
     market: str = Query("", description="市场代码: 主板, 创业板, 科创板, 北交所"), 
     list_status: str = Query("L", description="上市状态: L上市, D退市, P暂停上市")
@@ -100,7 +116,7 @@ def sync_stocks(
     return {"celery_task_id": task.id, "state": task.state, "detail": "同步任务已在后台启动"}
 
 
-@app.post("/stocks/sync_calendar")
+@app.post("/stocks/sync_calendar", tags=["基础数据"])
 def sync_calendar(
     exchange: str = Query("SSE", description="交易所代码: SSE上交所, SZSE深交所, CFFEX中金所, SHFE上期所, CZCE郑商所, DCE大商所, INE上能源")
 ):
@@ -111,7 +127,7 @@ def sync_calendar(
     return {"celery_task_id": task.id, "state": task.state, "detail": f"交易所 {exchange} 交易日历同步任务已启动"}
 
 
-@app.post("/indexes/sync_daily")
+@app.post("/indexes/sync_daily", tags=["指数数据"])
 def sync_index_daily(
     ts_code: str = Query("000001.SH", description="指数代码，例如 '000001.SH'"),
     start_date: str = Query("", description="开始日期 (YYYYMMDD)"),
@@ -125,7 +141,7 @@ def sync_index_daily(
     return {"celery_task_id": task.id, "state": task.state, "detail": f"指数 {ts_code} 同步任务已启动"}
 
 
-@app.post("/stocks/sync_history")
+@app.post("/stocks/sync_history", tags=["股票数据"])
 def sync_history(
     start_date: str = Query("20180101", description="开始日期 (YYYYMMDD)"), 
     end_date: str = Query(None, description="结束日期 (YYYYMMDD), 默认为昨天")
@@ -137,7 +153,7 @@ def sync_history(
     return {"celery_task_id": task.id, "state": task.state, "detail": "历史同步任务已启动，请通过 ID 查询进度"}
 
 
-@app.post("/stocks/sync_daily")
+@app.post("/stocks/sync_daily", tags=["股票数据"])
 def sync_daily(
     trade_date: str = Query(None, description="交易日期 (YYYYMMDD), 默认为当天")
 ):
@@ -150,7 +166,7 @@ def sync_daily(
     return {"celery_task_id": task.id, "state": task.state, "detail": f"{trade_date} 同步行情任务已启动"}
 
 
-@app.post("/stocks/rps/calculate")
+@app.post("/stocks/rps/calculate", tags=["数据分析"])
 def calculate_rps(
     trade_date: str = Query(None, description="计算日期 (YYYYMMDD), 默认为当天")
 ):
@@ -163,7 +179,7 @@ def calculate_rps(
     return {"celery_task_id": task.id, "state": task.state, "detail": f"{trade_date} RPS 计算任务已启动"}
 
 
-@app.post("/financial/sync")
+@app.post("/financial/sync", tags=["财务数据"])
 def sync_financial_data(
     ts_code: str = Query(..., description="股票代码 (例如: 000001.SZ)")
 ):
@@ -174,7 +190,7 @@ def sync_financial_data(
     return {"celery_task_id": task.id, "state": task.state, "detail": f"股票 {ts_code} 财务同步任务已启动"}
 
 
-@app.post("/stocks/check_data")
+@app.post("/stocks/check_data", tags=["数据维护"])
 def check_stock_data(
     start_date: str = Query("20180101", description="开始日期 (YYYYMMDD)"), 
     end_date: str = Query(None, description="结束日期 (YYYYMMDD), 默认为今天")
@@ -186,7 +202,7 @@ def check_stock_data(
     return {"celery_task_id": task.id, "state": task.state, "detail": "数据完整性检查任务已启动"}
 
 
-@app.post("/stocks/moneyflow/sync")
+@app.post("/stocks/moneyflow/sync", tags=["资金流向"])
 def sync_moneyflow(
     trade_date: str = Query(None, description="交易日期 (YYYYMMDD), 默认为当天")
 ):
@@ -199,7 +215,7 @@ def sync_moneyflow(
     return {"celery_task_id": task.id, "state": task.state, "detail": f"{trade_date} 资金流向同步任务已启动"}
 
 
-@app.post("/stocks/moneyflow/hsgt/sync")
+@app.post("/stocks/moneyflow/hsgt/sync", tags=["资金流向"])
 def sync_moneyflow_hsgt(
     trade_date: str = Query(None, description="交易日期 (YYYYMMDD)"),
     start_date: str = Query(None, description="开始日期 (YYYYMMDD)"),
@@ -214,7 +230,7 @@ def sync_moneyflow_hsgt(
     return {"celery_task_id": task.id, "state": task.state, "detail": "沪深港通资金流向同步任务已启动"}
 
 
-@app.post("/stocks/moneyflow/check_data")
+@app.post("/stocks/moneyflow/check_data", tags=["数据维护"])
 def check_moneyflow_data(
     start_date: str = Query("20180101", description="开始日期 (YYYYMMDD)"), 
     end_date: str = Query(None, description="结束日期 (YYYYMMDD), 默认为今天")
@@ -226,7 +242,7 @@ def check_moneyflow_data(
     return {"celery_task_id": task.id, "state": task.state, "detail": "资金流数据完整性检查任务已启动"}
 
 
-@app.post("/stocks/moneyflow/sync_history")
+@app.post("/stocks/moneyflow/sync_history", tags=["资金流向"])
 def sync_moneyflow_history(
     start_date: str = Query("20180101", description="开始日期 (YYYYMMDD)"), 
     end_date: str = Query(None, description="结束日期 (YYYYMMDD), 默认为昨天")
@@ -238,7 +254,7 @@ def sync_moneyflow_history(
     return {"celery_task_id": task.id, "state": task.state, "detail": "资金流向历史同步任务已启动"}
 
 
-@app.post("/sectors/ths_index/sync")
+@app.post("/sectors/ths_index/sync", tags=["板块数据"])
 def sync_ths_index(
     exchange: str = Query("A", description="交易所: A-中信/同花顺, SSE-上交所, SZSE-深交所"), 
     index_type: str = Query("", description="指数类型: N-板块, I-指数")
@@ -250,7 +266,7 @@ def sync_ths_index(
     return {"celery_task_id": task.id, "state": task.state, "detail": "同花顺板块指数同步任务已启动"}
 
 
-@app.post("/sectors/ths_member/sync")
+@app.post("/sectors/ths_member/sync", tags=["板块数据"])
 def sync_ths_member(
     ts_code: str = Query(..., description="板块指数代码 (例如: 885757.TI)")
 ):
