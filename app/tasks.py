@@ -271,6 +271,81 @@ def calculate_rps_task(trade_date: str):
         raise RuntimeError(f"日期 {trade_date}: RPS 计算失败")
 
 
+@celery.task(name="tasks.calculate_rps_history")
+def calculate_rps_history_task(start_date: str, end_date: str = None):
+    """
+    按日期范围循环计算 RPS 排名
+    """
+    fetcher = StockFetcher()
+    if end_date is None:
+        end_date = datetime.now().strftime("%Y%m%d")
+        
+    print(f"开始批量计算从 {start_date} 到 {end_date} 的 RPS...")
+    
+    # 获取该范围内的所有交易日
+    cal_df = fetcher.get_trade_cal(start_date=start_date, end_date=end_date, is_open=1)
+    if cal_df is None or cal_df.empty:
+        error_msg = f"RPS 历史计算失败: 获取交易日历失败 ({start_date} -> {end_date})。"
+        save_result(celery_task_id=calculate_rps_history_task.request.id, result=error_msg)
+        raise RuntimeError(error_msg)
+        
+    trade_days = cal_df['cal_date'].tolist()
+    total_days = len(trade_days)
+    
+    save_result(celery_task_id=calculate_rps_history_task.request.id, result=f"RPS 历史计算启动: {start_date} -> {end_date}, 共 {total_days} 个交易日。")
+    
+    from .data_fetcher.calculate_rps import RPSCalculator
+    calc = RPSCalculator()
+    
+    success_count = 0
+    for i, td in enumerate(trade_days):
+        try:
+            # 这里的计算是同步执行的，以控制数据库和内存压力
+            success = calc.run(td)
+            if success:
+                success_count += 1
+            
+            if i % 5 == 0:
+                progress_msg = f"RPS 计算进度: {i}/{total_days}, 当前日期: {td}, 已成功完成 {success_count} 天。"
+                save_result(celery_task_id=calculate_rps_history_task.request.id, result=progress_msg)
+                
+        except Exception as e:
+            print(f"计算日期 {td} 的 RPS 时发生错误: {e}")
+            
+    final_msg = f"RPS 历史计算完成! 共处理 {total_days} 个交易日，成功 {success_count} 天。"
+    save_result(celery_task_id=calculate_rps_history_task.request.id, result=final_msg)
+    return {"status": "completed", "total": total_days, "success": success_count}
+
+
+@celery.task(
+    name="tasks.sync_moneyflow_hsgt",
+    autoretry_for=(Exception,),
+    retry_kwargs={'max_retries': 3},
+    retry_backoff=60
+)
+def sync_moneyflow_hsgt_task(trade_date: str = "", start_date: str = "", end_date: str = ""):
+    """
+    同步沪深港通资金流向任务
+    """
+    fetcher = MoneyflowFetcher()
+    from .db import engine
+    from sqlalchemy import text
+    
+    df = fetcher.get_moneyflow_hsgt(trade_date=trade_date, start_date=start_date, end_date=end_date)
+    
+    if df is not None and not df.empty:
+        count = len(df)
+        with engine.begin() as conn:
+            # 批量 Upsert：先删除
+            dates = df['trade_date'].unique().tolist()
+            conn.execute(text("DELETE FROM stock_moneyflow_hsgt WHERE trade_date = ANY(:ds)"), {"ds": dates})
+            # 插入
+            df.to_sql("stock_moneyflow_hsgt", conn, if_exists="append", index=False)
+            
+        return {"status": "success", "count": count}
+    return {"status": "no_data"}
+
+
 @celery.task(name="tasks.sync_moneyflow_history")
 def sync_moneyflow_history_task(start_date: str = "20180101", end_date: str = None):
     """

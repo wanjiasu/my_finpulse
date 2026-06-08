@@ -19,7 +19,8 @@ from .tasks import (
     sync_index_daily_task,
     sync_trade_calendar_task,
     sync_financial_data_task,
-    calculate_rps_task
+    calculate_rps_task,
+    calculate_rps_history_task
 )
 
 app = FastAPI(
@@ -177,6 +178,18 @@ def calculate_rps(
         trade_date = datetime.now().strftime("%Y%m%d")
     task = calculate_rps_task.delay(trade_date=trade_date)
     return {"celery_task_id": task.id, "state": task.state, "detail": f"{trade_date} RPS 计算任务已启动"}
+
+
+@app.post("/stocks/rps/sync_history", tags=["数据分析"])
+def sync_rps_history(
+    start_date: str = Query(..., description="开始日期 (YYYYMMDD)"),
+    end_date: str = Query(None, description="结束日期 (YYYYMMDD), 默认为今天")
+):
+    """
+    异步批量计算指定日期范围内的 RPS 排名
+    """
+    task = calculate_rps_history_task.delay(start_date=start_date, end_date=end_date)
+    return {"celery_task_id": task.id, "state": task.state, "detail": f"从 {start_date} 到 {end_date or '今天'} 的 RPS 批量计算任务已启动"}
 
 
 @app.post("/financial/sync", tags=["财务数据"])
